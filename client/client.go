@@ -30,8 +30,8 @@ type RequestResult struct {
 type Client struct {
 	hostname      string
 	port          uint
-	ssl           bool
-	skipSSLVerify bool
+	tls           bool
+	skipTLSVerify bool
 	authKey       *string
 	timeout       time.Duration
 	readLimit     int64
@@ -43,12 +43,12 @@ type Client struct {
 }
 
 func New(options Options) *Client {
-	if options.SSL == nil {
-		options.SSL = ptr(false)
+	if options.TLS == nil {
+		options.TLS = ptr(false)
 	}
 
-	if options.SkipSSLVerify == nil {
-		options.SkipSSLVerify = ptr(false)
+	if options.SkipTLSVerify == nil {
+		options.SkipTLSVerify = ptr(false)
 	}
 
 	if options.Timeout == nil {
@@ -62,8 +62,8 @@ func New(options Options) *Client {
 	return &Client{
 		hostname:      options.Hostname,
 		port:          options.Port,
-		ssl:           *options.SSL,
-		skipSSLVerify: *options.SkipSSLVerify,
+		tls:           *options.TLS,
+		skipTLSVerify: *options.SkipTLSVerify,
 		authKey:       options.AuthKey,
 		timeout:       *options.Timeout,
 		readLimit:     *options.ReadLimit,
@@ -82,7 +82,7 @@ func (c *Client) Connect() error {
 
 	protocol := "ws"
 
-	if c.ssl {
+	if c.tls {
 		protocol = "wss"
 	}
 
@@ -91,7 +91,7 @@ func (c *Client) Connect() error {
 	httpClient := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: c.skipSSLVerify,
+				InsecureSkipVerify: c.skipTLSVerify,
 			},
 		},
 	}

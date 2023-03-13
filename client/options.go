@@ -9,8 +9,8 @@ import "time"
 type Options struct {
 	Hostname      string
 	Port          uint
-	SSL           *bool
-	SkipSSLVerify *bool
+	TLS           *bool
+	SkipTLSVerify *bool
 	AuthKey       *string
 	Timeout       *time.Duration
 	ReadLimit     *int64
