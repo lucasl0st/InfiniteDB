@@ -1,0 +1,12 @@
+version: "3"
+services:
+  infinitedb:
+    image: ghcr.io/lucasl0st/infinitedb:latest-unstable
+    ports:
+      - "8080:8080"
+    environment:
+      AUTHENTICATION: false
+      CACHE_SIZE: 100000
+    volumes:
+      - ./infinitedb_data:/var/lib/infinitedb
+    restart: always
