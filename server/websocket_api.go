@@ -185,6 +185,12 @@ func (w *WebsocketApi) createDatabaseHandler(conn *websocket.Conn, requestId int
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("name"))
 	}
 
+	err := validateName(name)
+
+	if err != nil {
+		return w.sendResults(conn, requestId, nil, err)
+	}
+
 	results, err := w.idb.CreateDatabase(name)
 
 	if err != nil {
@@ -205,6 +211,12 @@ func (w *WebsocketApi) deleteDatabaseHandler(conn *websocket.Conn, requestId int
 
 	if !isString {
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("name"))
+	}
+
+	err := validateName(name)
+
+	if err != nil {
+		return w.sendResults(conn, requestId, nil, err)
 	}
 
 	results, err := w.idb.DeleteDatabase(name)
@@ -229,6 +241,12 @@ func (w *WebsocketApi) getDatabaseHandler(conn *websocket.Conn, requestId int64,
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("name"))
 	}
 
+	err := validateName(name)
+
+	if err != nil {
+		return w.sendResults(conn, requestId, nil, err)
+	}
+
 	results, err := w.idb.GetDatabase(name)
 
 	if err != nil {
@@ -249,6 +267,12 @@ func (w *WebsocketApi) getDatabaseTablesHandler(conn *websocket.Conn, requestId 
 
 	if !isString {
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("name"))
+	}
+
+	err := validateName(name)
+
+	if err != nil {
+		return w.sendResults(conn, requestId, nil, err)
 	}
 
 	results, err := w.idb.GetDatabaseTables(name)
@@ -273,7 +297,19 @@ func (w *WebsocketApi) createTableInDatabaseHandler(conn *websocket.Conn, reques
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("name"))
 	}
 
+	err := validateName(name)
+
+	if err != nil {
+		return w.sendResults(conn, requestId, nil, err)
+	}
+
 	tableName, isString := r["tableName"].(string)
+
+	err = validateName(tableName)
+
+	if err != nil {
+		return w.sendResults(conn, requestId, nil, err)
+	}
 
 	if !isString {
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("tableName"))
@@ -299,7 +335,7 @@ func (w *WebsocketApi) createTableInDatabaseHandler(conn *websocket.Conn, reques
 	}
 
 	var f map[string]request.Field
-	err := toStruct(fields, &f)
+	err = toStruct(fields, &f)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -333,10 +369,22 @@ func (w *WebsocketApi) deleteTableInDatabaseHandler(conn *websocket.Conn, reques
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("name"))
 	}
 
+	err := validateName(name)
+
+	if err != nil {
+		return w.sendResults(conn, requestId, nil, err)
+	}
+
 	tableName, isString := r["tableName"].(string)
 
 	if !isString {
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("tableName"))
+	}
+
+	err = validateName(tableName)
+
+	if err != nil {
+		return w.sendResults(conn, requestId, nil, err)
 	}
 
 	results, err := w.idb.DeleteTableInDatabase(name, tableName)
@@ -361,10 +409,22 @@ func (w *WebsocketApi) getFromDatabaseTableHandler(conn *websocket.Conn, request
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("name"))
 	}
 
+	err := validateName(name)
+
+	if err != nil {
+		return w.sendResults(conn, requestId, nil, err)
+	}
+
 	tableName, isString := r["tableName"].(string)
 
 	if !isString {
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("tableName"))
+	}
+
+	err = validateName(tableName)
+
+	if err != nil {
+		return w.sendResults(conn, requestId, nil, err)
 	}
 
 	r, isMap := r["request"].(map[string]interface{})
@@ -374,7 +434,7 @@ func (w *WebsocketApi) getFromDatabaseTableHandler(conn *websocket.Conn, request
 	}
 
 	var req request.Request
-	err := toStruct(r, &req)
+	err = toStruct(r, &req)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -408,10 +468,22 @@ func (w *WebsocketApi) insertToDatabaseTableHandler(conn *websocket.Conn, reques
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("name"))
 	}
 
+	err := validateName(name)
+
+	if err != nil {
+		return w.sendResults(conn, requestId, nil, err)
+	}
+
 	tableName, isString := r["tableName"].(string)
 
 	if !isString {
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("tableName"))
+	}
+
+	err = validateName(tableName)
+
+	if err != nil {
+		return w.sendResults(conn, requestId, nil, err)
 	}
 
 	object, isMap := r["object"].(map[string]interface{})
@@ -442,10 +514,22 @@ func (w *WebsocketApi) removeFromDatabaseTableHandler(conn *websocket.Conn, requ
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("name"))
 	}
 
+	err := validateName(name)
+
+	if err != nil {
+		return w.sendResults(conn, requestId, nil, err)
+	}
+
 	tableName, isString := r["tableName"].(string)
 
 	if !isString {
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("tableName"))
+	}
+
+	err = validateName(tableName)
+
+	if err != nil {
+		return w.sendResults(conn, requestId, nil, err)
 	}
 
 	r, isMap := r["request"].(map[string]interface{})
@@ -455,7 +539,7 @@ func (w *WebsocketApi) removeFromDatabaseTableHandler(conn *websocket.Conn, requ
 	}
 
 	var req request.Request
-	err := toStruct(r, &req)
+	err = toStruct(r, &req)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -489,10 +573,22 @@ func (w *WebsocketApi) updateInDatabaseTableHandler(conn *websocket.Conn, reques
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("name"))
 	}
 
+	err := validateName(name)
+
+	if err != nil {
+		return w.sendResults(conn, requestId, nil, err)
+	}
+
 	tableName, isString := r["tableName"].(string)
 
 	if !isString {
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("tableName"))
+	}
+
+	err = validateName(tableName)
+
+	if err != nil {
+		return w.sendResults(conn, requestId, nil, err)
 	}
 
 	object, isMap := r["object"].(map[string]interface{})

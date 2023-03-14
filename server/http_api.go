@@ -103,6 +103,13 @@ func (h *HttpApi) createDatabaseHandler(c *gin.Context) {
 			return
 		}
 
+		err := validateName(name)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
+			return
+		}
+
 		results, err := h.idb.CreateDatabase(name)
 
 		if err == nil {
@@ -116,6 +123,13 @@ func (h *HttpApi) createDatabaseHandler(c *gin.Context) {
 func (h *HttpApi) deleteDatabaseHandler(c *gin.Context) {
 	name := c.Param("name")
 
+	err := validateName(name)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
+		return
+	}
+
 	results, err := h.idb.DeleteDatabase(name)
 
 	if err == nil {
@@ -128,6 +142,13 @@ func (h *HttpApi) deleteDatabaseHandler(c *gin.Context) {
 func (h *HttpApi) getDatabaseHandler(c *gin.Context) {
 	name := c.Param("name")
 
+	err := validateName(name)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
+		return
+	}
+
 	results, err := h.idb.GetDatabase(name)
 
 	if err == nil {
@@ -139,6 +160,13 @@ func (h *HttpApi) getDatabaseHandler(c *gin.Context) {
 
 func (h *HttpApi) getDatabaseTablesHandler(c *gin.Context) {
 	name := c.Param("name")
+
+	err := validateName(name)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
+		return
+	}
 
 	results, err := h.idb.GetDatabaseTables(name)
 
@@ -155,7 +183,21 @@ func (h *HttpApi) createTableInDatabaseHandler(c *gin.Context) {
 	if body != nil {
 		name := c.Param("name")
 
+		err := validateName(name)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
+			return
+		}
+
 		tableName, isString := (*body)["name"].(string)
+
+		err = validateName(tableName)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
+			return
+		}
 
 		if !isString {
 			c.JSON(http.StatusBadRequest, gin.H{"message": "tableName is not a string"})
@@ -184,7 +226,7 @@ func (h *HttpApi) createTableInDatabaseHandler(c *gin.Context) {
 		}
 
 		var f map[string]request.Field
-		err := toStruct(fields, &f)
+		err = toStruct(fields, &f)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
@@ -210,7 +252,22 @@ func (h *HttpApi) createTableInDatabaseHandler(c *gin.Context) {
 
 func (h *HttpApi) deleteTableInDatabaseHandler(c *gin.Context) {
 	name := c.Param("name")
+
+	err := validateName(name)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
+		return
+	}
+
 	tableName := c.Param("tableName")
+
+	err = validateName(tableName)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
+		return
+	}
 
 	results, err := h.idb.DeleteTableInDatabase(name, tableName)
 
@@ -226,7 +283,22 @@ func (h *HttpApi) getFromDatabaseTableHandler(c *gin.Context) {
 
 	if r != nil {
 		name := c.Param("name")
+
+		err := validateName(name)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
+			return
+		}
+
 		tableName := c.Param("tableName")
+
+		err = validateName(tableName)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
+			return
+		}
 
 		parsedRequest, err := parseRequest(*r)
 
@@ -245,13 +317,27 @@ func (h *HttpApi) getFromDatabaseTableHandler(c *gin.Context) {
 	}
 }
 
-// TODO check if table exists
 func (h *HttpApi) insertToDatabaseTableHandler(c *gin.Context) {
 	body := h.getBody(c)
 
 	if body != nil {
 		name := c.Param("name")
+
+		err := validateName(name)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
+			return
+		}
+
 		tableName := c.Param("tableName")
+
+		err = validateName(tableName)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
+			return
+		}
 
 		results, err := h.idb.InsertToDatabaseTable(name, tableName, *body)
 
@@ -268,7 +354,22 @@ func (h *HttpApi) removeFromDatabaseTableHandler(c *gin.Context) {
 
 	if r != nil {
 		name := c.Param("name")
+
+		err := validateName(name)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
+			return
+		}
+
 		tableName := c.Param("tableName")
+
+		err = validateName(tableName)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
+			return
+		}
 
 		parsedRequest, err := parseRequest(*r)
 
@@ -292,7 +393,22 @@ func (h *HttpApi) updateInDatabaseTableHandler(c *gin.Context) {
 
 	if body != nil {
 		name := c.Param("name")
+
+		err := validateName(name)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
+			return
+		}
+
 		tableName := c.Param("tableName")
+
+		err = validateName(tableName)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
+			return
+		}
 
 		results, err := h.idb.UpdateInDatabaseTable(name, tableName, *body)
 
