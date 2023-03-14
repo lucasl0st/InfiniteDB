@@ -31,6 +31,10 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     if: github.event.action == ''
+    env:
+      image: infinitedb
+      repository: ghcr.io/lucasl0st
+      tag_name: latest-unstable
     steps:
       - uses: actions/checkout@v3
 
@@ -40,6 +44,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.0.1
+
       - name: Login to Github Docker Registry
         run: |
           echo $GHCR_TOKEN | docker login ghcr.io -u lucasl0st --password-stdin
@@ -48,16 +55,37 @@ jobs:
 
       - name: Build and push
         uses: docker/build-push-action@v4
+        id: docker_push
         with:
           push: true
           platforms: linux/amd64
           provenance: false
-          tags: ghcr.io/lucasl0st/infinitedb:latest-unstable
+          tags: ${{ env.repository }}/${{ env.image }}:${{ env.tag_name }}
+
+      - name: Sign Docker image with Cosign
+        run: |
+          cosign sign --key env://COSIGN_PRIVATE_KEY ${TAGS} -y \
+                      -a "repo=${{ github.repository }}" \
+                      -a "workflow=${{ github.workflow }}" \
+                      -a "ref=${{ github.sha }}" \
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          TAGS: ${{ env.repository }}/${{ env.image }}@${{ steps.docker_push.outputs.digest }}
+
+      - name: Delete untagged versions from GHCR
+        uses: actions/delete-package-versions@v4
+        with:
+          package-name: infinitedb
+          package-type: container
+          delete-only-untagged-versions: true
+          token: ${{ secrets.GHCR_TOKEN }}
 
       - name: Delete old versions from GHCR
         uses: actions/delete-package-versions@v4
         with:
           package-name: infinitedb
           package-type: container
-          delete-only-untagged-versions: true
+          min-versions-to-keep: 2
+          ignore-versions: '^(0|[1-9]\\d*)\\.0\\.0$'
           token: ${{ secrets.GHCR_TOKEN }}
