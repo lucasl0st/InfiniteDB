@@ -45,6 +45,8 @@ go build -o infinitedb-server
 To use the go client install it using 
 `go get github.com/lucasl0st/InfiniteDB/client`
 
+The server provides an HTTP Api and a Websocket Api, support for other languages will follow in the future.
+
 ### Usage
 
 ```go
