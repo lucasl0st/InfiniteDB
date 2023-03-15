@@ -26,11 +26,7 @@ func New(max uint) *Cache {
 	}
 
 	go func() {
-		for {
-			if !c.active {
-				return
-			}
-
+		for c.active {
 			c.collector()
 
 			time.Sleep(time.Second * 60)

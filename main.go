@@ -9,6 +9,9 @@ import (
 	"github.com/lucasl0st/InfiniteDB/server"
 	"github.com/lucasl0st/InfiniteDB/util"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
@@ -19,6 +22,21 @@ func main() {
 		util.LoggerWithPrefix{Prefix: "[idblib]"},
 		&metricsReceiver,
 	)
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan,
+		syscall.SIGINT,
+		syscall.SIGKILL,
+		syscall.SIGTERM,
+		syscall.SIGQUIT)
+
+	go func() {
+		_ = <-sigChan
+
+		s.Kill()
+
+		os.Exit(0)
+	}()
 
 	if err != nil {
 		log.Fatal(err.Error())

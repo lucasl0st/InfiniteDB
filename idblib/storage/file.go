@@ -65,11 +65,7 @@ func NewFile(path string, logger util.Logger, metrics *metrics.Metrics) (*File, 
 	}
 
 	go func() {
-		for {
-			if !f.watch {
-				return
-			}
-
+		for f.watch {
 			f.watchChanges()
 		}
 	}()
