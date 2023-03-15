@@ -83,3 +83,7 @@ func (s *Server) Run() error {
 		return s.r.Run(":" + fmt.Sprint(s.c.Port))
 	}
 }
+
+func (s *Server) Kill() {
+	s.idb.Kill()
+}

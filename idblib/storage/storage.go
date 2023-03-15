@@ -61,11 +61,7 @@ func NewStorage(
 	}
 
 	go func() {
-		for {
-			if !s.write {
-				return
-			}
-
+		for s.write {
 			s.writer()
 
 			time.Sleep(time.Second)
@@ -180,9 +176,13 @@ func (s *Storage) NumberOfObjects() int64 {
 
 func (s *Storage) Kill() {
 	s.c.Kill()
+
 	s.file.Kill()
-	s.writeQueueLock.Lock()
+
 	s.write = false
+
+	s.writer()
+	s.writeQueueLock.Lock()
 }
 
 func (s *Storage) addStorageObject(storageObject object) {

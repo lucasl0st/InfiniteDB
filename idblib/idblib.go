@@ -24,12 +24,13 @@ import (
 )
 
 type IDB struct {
-	databasePath string
-	databases    map[string]*database.Database
-	l            util.Logger
-	m            *metrics.Metrics
-	cacheSize    uint
-	watcher      *fsnotify.Watcher
+	databasePath   string
+	databases      map[string]*database.Database
+	l              util.Logger
+	m              *metrics.Metrics
+	cacheSize      uint
+	watcher        *fsnotify.Watcher
+	watchDatabases bool
 }
 
 func New(databasePath string, logger util.Logger, metricsReceiver *metrics.Receiver, cacheSize uint) (*IDB, error) {
@@ -54,12 +55,13 @@ func New(databasePath string, logger util.Logger, metricsReceiver *metrics.Recei
 	}
 
 	idb := &IDB{
-		databasePath: databasePath,
-		databases:    make(map[string]*database.Database),
-		l:            logger,
-		m:            metrics.New(metricsReceiver),
-		cacheSize:    cacheSize,
-		watcher:      watcher,
+		databasePath:   databasePath,
+		databases:      make(map[string]*database.Database),
+		l:              logger,
+		m:              metrics.New(metricsReceiver),
+		cacheSize:      cacheSize,
+		watcher:        watcher,
+		watchDatabases: true,
 	}
 
 	err = idb.loadDatabases()
@@ -69,7 +71,7 @@ func New(databasePath string, logger util.Logger, metricsReceiver *metrics.Recei
 	}
 
 	go func() {
-		for {
+		for idb.watchDatabases {
 			idb.databaseWatcher()
 		}
 	}()
@@ -108,6 +110,14 @@ func (i *IDB) databaseWatcher() {
 			d.Kill()
 			delete(i.databases, databaseName)
 		}
+	}
+}
+
+func (i *IDB) Kill() {
+	i.watchDatabases = false
+
+	for _, d := range i.databases {
+		d.Kill()
 	}
 }
 
