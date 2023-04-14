@@ -126,11 +126,11 @@ func (c *Client) Connect() error {
 	version, isString := r["database_version"].(string)
 
 	if !isString {
-		return errors.New("did not receive database version")
+		return e.DidNotReceiveDatabaseVersion()
 	}
 
 	if version != VERSION {
-		return errors.New("this client is not compatible with the database version")
+		return e.ClientNotCompatibleWithDatabaseServer(version, VERSION)
 	}
 
 	c.connected = true
@@ -178,7 +178,7 @@ func (c *Client) read() {
 
 func (c *Client) sendRequest(request map[string]interface{}) (map[string]interface{}, error) {
 	if !c.connected {
-		return nil, errors.New("client is not connected")
+		return nil, e.ClientNotConnected()
 	}
 
 	requestId := int64(float64(rand.Int()))

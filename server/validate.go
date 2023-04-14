@@ -5,7 +5,7 @@
 package server
 
 import (
-	"errors"
+	e "github.com/lucasl0st/InfiniteDB/errors"
 	"regexp"
 )
 
@@ -17,7 +17,7 @@ func validateName(name string) error {
 	}
 
 	if !r.MatchString(name) {
-		return errors.New("name does not match allowed pattern")
+		return e.NameDoesNotMatchAllowedPattern(name)
 	}
 
 	return nil

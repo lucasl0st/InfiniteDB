@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2023 Lucas Pape
+ */
+
 package util
 
 type Logger interface {

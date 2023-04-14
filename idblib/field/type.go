@@ -4,12 +4,12 @@
 
 package field
 
-type DatabaseType int
+type DatabaseType string
 
 const (
-	BOOL   DatabaseType = 1
-	NUMBER DatabaseType = 14
-	TEXT   DatabaseType = 24
+	BOOL   DatabaseType = "bool"
+	NUMBER DatabaseType = "number"
+	TEXT   DatabaseType = "text"
 )
 
 var databaseTypesMap = map[string]DatabaseType{

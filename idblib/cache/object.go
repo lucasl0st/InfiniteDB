@@ -4,7 +4,9 @@
 
 package cache
 
+import "github.com/lucasl0st/InfiniteDB/idblib/dbtype"
+
 type object struct {
-	m        map[string]interface{}
+	m        map[string]dbtype.DBType
 	priority int64
 }

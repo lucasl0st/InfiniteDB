@@ -5,6 +5,7 @@
 package cache
 
 import (
+	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	idblib "github.com/lucasl0st/InfiniteDB/idblib/object"
 	"sort"
 	"sync"
@@ -53,7 +54,7 @@ func (c *Cache) Remove(id int64) {
 	c.m.Delete(id)
 }
 
-func (c *Cache) Get(id int64) *map[string]interface{} {
+func (c *Cache) Get(id int64) *map[string]dbtype.DBType {
 	a, have := c.m.Load(id)
 
 	if have {

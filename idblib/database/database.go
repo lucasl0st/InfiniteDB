@@ -223,7 +223,7 @@ func (d *Database) GetTableNames() []string {
 	return tableNames
 }
 
-func (d *Database) Get(tableName string, request table.Request) ([]object.Object, error) {
+func (d *Database) Get(tableName string, request table.Request) ([]map[string]interface{}, error) {
 	if request.Query != nil {
 		t := d.tables[tableName]
 
@@ -241,13 +241,33 @@ func (d *Database) Get(tableName string, request table.Request) ([]object.Object
 
 		results := t.Storage.GetObjects(objects)
 
+		implementObjectsMap := map[int64]map[string]interface{}{}
+
 		if request.Implement != nil {
+			for _, id := range objects {
+				implementObjectsMap[id] = map[string]interface{}{}
+			}
+
 			for _, implement := range request.Implement {
-				results, err = d.implement(implement, results)
+				i, as, err := d.implement(t, implement, results)
+
+				if err != nil {
+					return nil, err
+				}
+
+				for id, implementedObject := range i {
+					implementObjectsMap[id][*as] = implementedObject
+				}
 			}
 		}
 
-		return results, err
+		interfaceObjects, err := d.objectsToMapStringInterfaceArray(results, t, implementObjectsMap)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return interfaceObjects, err
 	} else {
 		return nil, nil
 	}
@@ -265,7 +285,13 @@ func (d *Database) Remove(tableName string, request table.Request) (int64, error
 	var count int64 = 0
 
 	for _, o := range objects {
-		err = t.Remove(&o)
+		om, err := t.InterfaceMapToObject(o)
+
+		if err != nil {
+			return 0, err
+		}
+
+		err = t.Remove(om)
 
 		if err != nil {
 			return count, err
@@ -294,66 +320,31 @@ func (d *Database) Update(tableName string, o map[string]interface{}) error {
 		return e.TableDoesNotExist()
 	}
 
-	foundObjectId, err := t.FindExisting(o)
-
-	if err != nil {
-		return err
-	}
-
-	foundObject := t.Storage.GetObject(foundObjectId)
-
-	for key, value := range o {
-		foundObject.M[key] = value
-	}
-
-	return t.Update(foundObject)
+	return t.Update(o)
 }
 
-func (d *Database) implement(implement request.Implement, objects []object.Object) ([]object.Object, error) {
-	fromTable := d.tables[implement.From.Table]
-
-	if fromTable == nil {
-		return nil, e.TableDoesNotExist()
-	}
+func (d *Database) objectsToMapStringInterfaceArray(objects []object.Object, t *table.Table, implementObjectsMap map[int64]map[string]interface{}) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
 
 	for _, o := range objects {
-		f := util.InterfaceToString(o.M[implement.Field])
-
-		implementObjects, _, err := fromTable.Query(table.Query{
-			Where: &request.Where{
-				Field:    implement.From.Field,
-				Operator: request.EQUALS,
-				Value:    &f,
-			},
-		}, nil, nil)
+		interfaceMap, err := t.ObjectToInterfaceMap(o)
 
 		if err != nil {
 			return nil, err
 		}
 
-		if len(implementObjects) > 0 {
-			as := implement.From.Table
+		implementObjects, ok := implementObjectsMap[o.Id]
 
-			if implement.As != nil {
-				as = *implement.As
-			}
-
-			if len(implementObjects) > 1 || (implement.ForceArray != nil && *implement.ForceArray) {
-				maps := make([]map[string]interface{}, 0)
-
-				for _, o := range implementObjects {
-					maps = append(maps, fromTable.Storage.GetObject(o).M)
-				}
-
-				o.M[as] = maps
-			} else {
-				io := fromTable.Storage.GetObject(implementObjects[0])
-				o.M[as] = io.M
+		if ok {
+			for key, value := range implementObjects {
+				interfaceMap[key] = value
 			}
 		}
+
+		results = append(results, interfaceMap)
 	}
 
-	return objects, nil
+	return results, nil
 }
 
 func (d *Database) Kill() {

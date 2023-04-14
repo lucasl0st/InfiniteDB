@@ -6,9 +6,9 @@ package functions
 
 import (
 	e "github.com/lucasl0st/InfiniteDB/errors"
+	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/object"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
-	"github.com/lucasl0st/InfiniteDB/util"
 	"math"
 )
 
@@ -39,38 +39,26 @@ func (d *DistanceFunction) Run(
 	}
 
 	for _, o := range objects {
-		var fromLatitudeValue float64 = 0
-		var fromLongitudeValue float64 = 0
+		var fromLatitudeValue dbtype.Number
+		var fromLongitudeValue dbtype.Number
 
 		if additionalFields[o][d.latitudeFrom] != nil {
-			fromLatitudeValue = additionalFields[o][d.latitudeFrom].(float64)
+			fromLatitudeValue = additionalFields[o][d.latitudeFrom].(dbtype.Number)
 		} else {
-			v, err := util.StringToNumber(table.Index.GetValue(d.latitudeFrom, o))
-
-			if err != nil {
-				return nil, nil, err
-			}
-
-			fromLatitudeValue = v
+			fromLatitudeValue = table.Index.GetValue(d.latitudeFrom, o).(dbtype.Number)
 		}
 
 		if additionalFields[o][d.longitudeFrom] != nil {
-			fromLongitudeValue = additionalFields[o][d.longitudeFrom].(float64)
+			fromLongitudeValue = additionalFields[o][d.longitudeFrom].(dbtype.Number)
 		} else {
-			v, err := util.StringToNumber(table.Index.GetValue(d.longitudeFrom, o))
-
-			if err != nil {
-				return nil, nil, err
-			}
-
-			fromLongitudeValue = v
+			fromLongitudeValue = table.Index.GetValue(d.longitudeFrom, o).(dbtype.Number)
 		}
 
 		if additionalFields[o] == nil {
-			additionalFields[o] = make(map[string]interface{})
+			additionalFields[o] = make(map[string]dbtype.DBType)
 		}
 
-		additionalFields[o][d.as] = d.distance(fromLatitudeValue, fromLongitudeValue, d.latitudeToValue, d.longitudeToValue)
+		additionalFields[o][d.as] = dbtype.NumberFromFloat64(d.distance(fromLatitudeValue.ToFloat64(), fromLongitudeValue.ToFloat64(), d.latitudeToValue, d.longitudeToValue))
 	}
 
 	return objects, additionalFields, nil

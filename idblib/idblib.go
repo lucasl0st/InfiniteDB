@@ -12,7 +12,6 @@ import (
 	"github.com/lucasl0st/InfiniteDB/idblib/database"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
-	"github.com/lucasl0st/InfiniteDB/idblib/object"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
 	"github.com/lucasl0st/InfiniteDB/request"
 	"github.com/lucasl0st/InfiniteDB/response"
@@ -329,7 +328,7 @@ func (i *IDB) GetFromDatabaseTable(name string, tableName string, request table.
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	objectsChannel := make(chan []object.Object, 1)
+	objectsChannel := make(chan []map[string]interface{}, 1)
 	errChannel := make(chan error, 1)
 
 	go func() {
@@ -352,16 +351,10 @@ func (i *IDB) GetFromDatabaseTable(name string, tableName string, request table.
 		return response.GetFromDatabaseTableResponse{}, err
 	}
 
-	var results []map[string]interface{}
-
-	for _, o := range objects {
-		results = append(results, o.M)
-	}
-
 	return response.GetFromDatabaseTableResponse{
 		Name:      name,
 		TableName: tableName,
-		Results:   results,
+		Results:   objects,
 	}, nil
 }
 

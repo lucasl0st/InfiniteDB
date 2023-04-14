@@ -4,7 +4,11 @@
 
 package object
 
+import (
+	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
+)
+
 type Object struct {
 	Id int64
-	M  map[string]interface{}
+	M  map[string]dbtype.DBType
 }

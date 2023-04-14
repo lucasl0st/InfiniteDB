@@ -7,8 +7,11 @@ package storage
 import (
 	"encoding/json"
 	"github.com/lucasl0st/InfiniteDB/idblib/cache"
+	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
+	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
 	idblib "github.com/lucasl0st/InfiniteDB/idblib/object"
+	idbutil "github.com/lucasl0st/InfiniteDB/idblib/util"
 	"github.com/lucasl0st/InfiniteDB/util"
 	"sort"
 	"sync"
@@ -26,6 +29,7 @@ type Storage struct {
 	deletedObject  func(object idblib.Object)
 	l              util.Logger
 	write          bool
+	fields         map[string]field.Field
 }
 
 func NewStorage(
@@ -35,6 +39,7 @@ func NewStorage(
 	logger util.Logger,
 	metrics *metrics.Metrics,
 	cacheSize uint,
+	fields map[string]field.Field,
 ) (*Storage, error) {
 	file, err := NewFile(path+objectsFileName, logger, metrics)
 
@@ -49,6 +54,7 @@ func NewStorage(
 		addedObject:   addedObject,
 		deletedObject: deletedObject,
 		write:         true,
+		fields:        fields,
 	}
 
 	s.file.AddedLine = s.addedLine
@@ -95,10 +101,7 @@ func (s *Storage) GetObject(id int64) *idblib.Object {
 		return nil
 	}
 
-	o := idblib.Object{
-		Id: storageObject.Id,
-		M:  *storageObject.Object,
-	}
+	o := s.storageObjectToObject(*storageObject)
 
 	s.c.Set(o)
 
@@ -138,10 +141,7 @@ func (s *Storage) GetObjects(ids []int64) []idblib.Object {
 			return nil
 		}
 
-		o := idblib.Object{
-			Id: storageObject.Id,
-			M:  *storageObject.Object,
-		}
+		o := s.storageObjectToObject(storageObject)
 
 		s.c.Set(o)
 
@@ -152,11 +152,8 @@ func (s *Storage) GetObjects(ids []int64) []idblib.Object {
 }
 
 func (s *Storage) AddObject(o idblib.Object) {
-	storageObject := object{
-		Object: &o.M,
-	}
-
-	s.addStorageObject(storageObject)
+	so := s.objectToStorageObject(o)
+	s.addStorageObject(so)
 }
 
 func (s *Storage) DeleteObject(o idblib.Object) {
@@ -212,11 +209,7 @@ func (s *Storage) addedLine(line string) {
 		o := s.GetObject(*storageObject.RefersTo)
 		s.deletedObject(*o)
 	} else {
-		o := idblib.Object{
-			Id: storageObject.Id,
-			M:  *storageObject.Object,
-		}
-
+		o := s.storageObjectToObject(storageObject)
 		s.addedObject(o)
 	}
 }
@@ -312,4 +305,41 @@ func (s *Storage) writer() {
 			s.l.Fatal(err)
 		}
 	}
+}
+
+func (s *Storage) objectToStorageObject(o idblib.Object) object {
+	storageObject := object{
+		Object: map[string]string{},
+	}
+
+	for key, value := range o.M {
+		storageObject.Object[key] = value.ToString()
+	}
+
+	return storageObject
+}
+
+func (s *Storage) storageObjectToObject(storageObject object) idblib.Object {
+	o := idblib.Object{
+		Id: storageObject.Id,
+		M:  map[string]dbtype.DBType{},
+	}
+
+	for _, f := range s.fields {
+		str, ok := storageObject.Object[f.Name]
+
+		if !ok {
+			continue
+		}
+
+		v, err := idbutil.StringToDBType(str, f)
+
+		if err != nil {
+			panic(err.Error())
+		}
+
+		o.M[f.Name] = v
+	}
+
+	return o
 }

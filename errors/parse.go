@@ -36,3 +36,7 @@ func IsNotAMap(param string) error {
 func IsNotANumber(param string) error {
 	return errors.New(fmt.Sprintf("%s is not a number", param))
 }
+
+func OnlyValueAllOrAny() error {
+	return errors.New("can only have value, all or any, not in combination")
+}
