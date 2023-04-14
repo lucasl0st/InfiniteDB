@@ -88,9 +88,15 @@ func Docker_all(push bool) error {
 		return err
 	}
 
-	tag := fmt.Sprintf("%s:%s", dockerImage, version())
+	v, err := version()
 
-	binary := fmt.Sprintf("%s/%s_%s_%s", buildDir, binaryName, version(), osLinux)
+	if err != nil {
+		return err
+	}
+
+	tag := fmt.Sprintf("%s:%s", dockerImage, v)
+
+	binary := fmt.Sprintf("%s/%s_%s_%s", buildDir, binaryName, v, osLinux)
 
 	platform := ""
 
@@ -107,7 +113,7 @@ func Docker_all(push bool) error {
 	platform = strings.TrimSuffix(platform, ",")
 
 	args := []string{
-		"build",
+		"buildx", "build",
 		".",
 		"--platform", fmt.Sprint(platform),
 		"--build-arg", fmt.Sprintf("binary=%s", binary),
@@ -118,9 +124,7 @@ func Docker_all(push bool) error {
 		args = append(args, "--push")
 	}
 
-	sh.RunV("docker-buildx", args...)
-
-	return nil
+	return sh.RunV("docker", args...)
 }
 
 func targetToDockerPlatform(t target) (*dockerPlatform, error) {
@@ -189,9 +193,8 @@ func Build_windows() error {
 	return err
 }
 
-func version() string {
-	v, _ := sh.Output("git", "describe", "--tags")
-	return v
+func version() (string, error) {
+	return sh.Output("git", "describe", "--tags", "--always")
 }
 
 func buildForOs(o operating_system) ([]result, error) {
@@ -215,7 +218,11 @@ func buildForOs(o operating_system) ([]result, error) {
 }
 
 func build(t target) (*result, error) {
-	v := version()
+	v, err := version()
+
+	if err != nil {
+		return nil, err
+	}
 
 	out := fmt.Sprintf("%s/%s_%s_%s_%s", buildDir, binaryName, v, t.Os, t.Arch)
 
@@ -224,7 +231,7 @@ func build(t target) (*result, error) {
 		"GOARCH": fmt.Sprint(t.Arch),
 	}
 
-	err := sh.RunWithV(env, "go", "build", "-o", out)
+	err = sh.RunWithV(env, "go", "build", "-o", out)
 
 	if err != nil {
 		return nil, err
