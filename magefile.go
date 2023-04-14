@@ -119,6 +119,8 @@ func Docker_all(push bool) error {
 		"--platform", fmt.Sprint(platform),
 		"--build-arg", fmt.Sprintf("binary=%s", binary),
 		"--provenance", "false",
+		"--progress", "plain",
+		"--no-cache",
 	}
 
 	if push {
@@ -233,8 +235,9 @@ func build(t target) (*result, error) {
 	out := fmt.Sprintf("%s/%s_%s_%s_%s", buildDir, binaryName, v, t.Os, t.Arch)
 
 	env := map[string]string{
-		"GOOS":   fmt.Sprint(t.Os),
-		"GOARCH": fmt.Sprint(t.Arch),
+		"CGO_ENABLED": fmt.Sprint("0"),
+		"GOOS":        fmt.Sprint(t.Os),
+		"GOARCH":      fmt.Sprint(t.Arch),
 	}
 
 	err = sh.RunWithV(env, "go", "build", "-o", out)
