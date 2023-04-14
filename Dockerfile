@@ -1,14 +1,11 @@
-FROM golang:1.20-alpine as builder
+FROM alpine as builder
 
-WORKDIR /src
+ARG TARGETARCH
 
-COPY go.mod ./
-COPY go.sum ./
-RUN go mod download
+ARG binary
+RUN if [ -z "$binary" ] ; then echo binary argument not provided ; else echo using binary $binary ; fi
 
-COPY . ./
-
-RUN go build -o /infinitedb-server
+COPY ./"$binary"_"$TARGETARCH" /usr/bin/infinitedb-server
 
 FROM scratch
 
@@ -19,7 +16,8 @@ LABEL org.opencontainers.image.licenses=GPL-3.0
 ENV GIN_MODE=release
 ENV PORT=8080
 
-COPY --from=builder /infinitedb-server /usr/bin/infinitedb-server
+ARG binary
+COPY --from=builder /usr/bin/infinitedb-server /usr/bin/infinitedb-server
 COPY --from=tarampampam/curl:7.88.1 /bin/curl /bin/curl
 
 EXPOSE $PORT
