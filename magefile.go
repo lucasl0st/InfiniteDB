@@ -17,7 +17,10 @@ import (
 const binaryName = "infinitedb-server"
 const buildDir = "build"
 
-const dockerImage = "ghcr.io/lucasl0st/infinitedb"
+var dockerImages = []string{
+	"ghcr.io/lucasl0st/infinitedb",
+	"lucasl0st/infinitedb",
+}
 
 type architecture string
 
@@ -94,8 +97,6 @@ func Docker_all(push bool) error {
 		return err
 	}
 
-	tag := fmt.Sprintf("%s:%s", dockerImage, v)
-
 	binary := fmt.Sprintf("%s/%s_%s_%s", buildDir, binaryName, v, osLinux)
 
 	platform := ""
@@ -118,11 +119,15 @@ func Docker_all(push bool) error {
 		"--platform", fmt.Sprint(platform),
 		"--build-arg", fmt.Sprintf("binary=%s", binary),
 		"--provenance", "false",
-		"-t", tag,
 	}
 
 	if push {
 		args = append(args, "--push")
+	}
+
+	for _, image := range dockerImages {
+		tag := fmt.Sprintf("%s:%s", image, v)
+		args = append(args, []string{"-t", tag}...)
 	}
 
 	return sh.RunV("docker", args...)
