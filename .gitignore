@@ -20,3 +20,4 @@ databases/
 
 *.key
 *.crt
+build/
