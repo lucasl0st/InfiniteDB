@@ -117,6 +117,7 @@ func Docker_all(push bool) error {
 		".",
 		"--platform", fmt.Sprint(platform),
 		"--build-arg", fmt.Sprintf("binary=%s", binary),
+		"--provenance", "false",
 		"-t", tag,
 	}
 
