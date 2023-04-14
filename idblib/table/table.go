@@ -5,11 +5,14 @@
 package table
 
 import (
+	"fmt"
 	e "github.com/lucasl0st/InfiniteDB/errors"
+	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
 	"github.com/lucasl0st/InfiniteDB/idblib/object"
 	"github.com/lucasl0st/InfiniteDB/idblib/storage"
+	idbutil "github.com/lucasl0st/InfiniteDB/idblib/util"
 	"github.com/lucasl0st/InfiniteDB/request"
 	"github.com/lucasl0st/InfiniteDB/util"
 	"os"
@@ -44,7 +47,7 @@ func NewTable(
 		Index:        field.NewIndex(config.Fields),
 	}
 
-	s, err := storage.NewStorage(path+name+"/", table.addedObject, table.deletedObject, logger, metrics, cacheSize)
+	s, err := storage.NewStorage(path+name+"/", table.addedObject, table.deletedObject, logger, metrics, cacheSize, config.Fields)
 
 	if err != nil {
 		return nil, err
@@ -70,28 +73,19 @@ func (t *Table) deletedObject(object object.Object) {
 }
 
 func (t *Table) Where(w request.Where, andObjects object.Objects) (object.Objects, error) {
-	v := util.InterfaceToString(w.Value)
+	f := t.Config.Fields[w.Field]
 
-	parseNumber := t.Config.Fields[w.Field].Type == field.NUMBER
-
-	var err error
 	var results object.Objects
 
 	switch w.Operator {
-	case request.EQUALS:
-		if andObjects == nil {
-			results = t.Index.Equal(w.Field, v)
-		} else {
-			results = t.andEqual(andObjects, w.Field, v)
-		}
-	case request.NOT:
-		if andObjects == nil {
-			results = t.Index.Not(w.Field, v)
-		} else {
-			results = t.andNot(andObjects, w.Field, v)
-		}
 	case request.MATCH:
-		r, err := regexp.Compile(v)
+		s, ok := w.Value.(string)
+
+		if !ok {
+			return nil, e.ValueForOperatorMustBeString(request.MATCH)
+		}
+
+		r, err := regexp.Compile(s)
 
 		if err != nil {
 			return nil, err
@@ -102,36 +96,71 @@ func (t *Table) Where(w request.Where, andObjects object.Objects) (object.Object
 		} else {
 			results = t.andMatch(andObjects, w.Field, *r)
 		}
-	case request.SMALLER:
-		if andObjects == nil {
-			results, err = t.Index.Smaller(w.Field, v, parseNumber)
-		} else {
-			results, err = t.andSmaller(andObjects, w.Field, v, parseNumber)
-		}
-	case request.LARGER:
-		if andObjects == nil {
-			results, err = t.Index.Larger(w.Field, v, parseNumber)
-		} else {
-			results, err = t.andLarger(andObjects, w.Field, v, parseNumber)
-		}
 	case request.BETWEEN:
-		values := strings.Split(v, "-")
+		s, ok := w.Value.(string)
+
+		if !ok {
+			return nil, e.ValueForOperatorMustBeString(request.BETWEEN)
+		}
+
+		values := strings.Split(s, "-")
 
 		if len(values) <= 1 {
 			return nil, e.NotEnoughValuesForOperator(w.Operator)
 		}
 
+		smaller, err := idbutil.StringToDBType(values[0], f)
+
+		if err != nil {
+			return nil, err
+		}
+
+		larger, err := idbutil.StringToDBType(values[1], f)
+
 		if andObjects == nil {
-			results, err = t.Index.Between(w.Field, values[0], values[1], parseNumber)
+			results, err = t.Index.Between(w.Field, smaller, larger)
 		} else {
-			results, err = t.andBetween(andObjects, w.Field, values[0], values[1], parseNumber)
+			results, err = t.andBetween(andObjects, w.Field, smaller, larger)
+		}
+
+		if err != nil {
+			return nil, err
 		}
 	default:
-		return nil, e.NotAValidOperator()
-	}
+		v, err := idbutil.InterfaceToDBType(w.Value, f)
 
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
+
+		switch w.Operator {
+		case request.EQUALS:
+			if andObjects == nil {
+				results = t.Index.Equal(w.Field, v)
+			} else {
+				results = t.andEqual(andObjects, w.Field, v)
+			}
+		case request.NOT:
+			if andObjects == nil {
+				results = t.Index.Not(w.Field, v)
+			} else {
+				results = t.andNot(andObjects, w.Field, v)
+			}
+		case request.SMALLER:
+			if andObjects == nil {
+				results, err = t.Index.Smaller(w.Field, v)
+			} else {
+				results, err = t.andSmaller(andObjects, w.Field, v)
+			}
+		case request.LARGER:
+			if andObjects == nil {
+				results, err = t.Index.Larger(w.Field, v)
+			} else {
+				results, err = t.andLarger(andObjects, w.Field, v)
+			}
+		default:
+			return nil, e.NotAValidOperator()
+		}
 	}
 
 	return results, nil
@@ -250,29 +279,31 @@ func (t *Table) Query(q Query, andObjects object.Objects, additionalFields Addit
 }
 
 func (t *Table) Insert(objectM map[string]interface{}) error {
-	o := object.Object{
-		M: objectM,
-	}
-
-	runMiddleware, insert := InsertMiddleware(t, &o)
+	runMiddleware, insert := InsertMiddleware(t, objectM)
 
 	if runMiddleware {
 		return insert()
 	}
 
-	err := t.allFieldsHaveValues(&o)
+	o, err := t.InterfaceMapToObject(objectM)
 
 	if err != nil {
 		return err
 	}
 
-	err = t.isUnique(&o)
+	err = t.allFieldsHaveValues(o)
 
 	if err != nil {
 		return err
 	}
 
-	t.Storage.AddObject(o)
+	err = t.isUnique(o)
+
+	if err != nil {
+		return err
+	}
+
+	t.Storage.AddObject(*o)
 
 	if err != nil {
 		return err
@@ -281,32 +312,56 @@ func (t *Table) Insert(objectM map[string]interface{}) error {
 	return nil
 }
 
-func (t *Table) Update(object *object.Object) error {
-	runMiddleware, update := UpdateMiddleware(t, object)
+func (t *Table) Update(objectM map[string]interface{}) error {
+	runMiddleware, update := UpdateMiddleware(t, objectM)
 
 	if runMiddleware {
 		return update()
 	}
 
-	err := t.allFieldsHaveValues(object)
+	foundObjectId, err := t.FindExisting(objectM)
 
 	if err != nil {
 		return err
 	}
 
-	err = t.isUnique(object)
+	o := t.Storage.GetObject(foundObjectId)
+
+	for _, f := range t.Config.Fields {
+		updatedValue, ok := objectM[f.Name]
+
+		if !ok {
+			continue
+		}
+
+		v, err := idbutil.InterfaceToDBType(updatedValue, f)
+
+		if err != nil {
+			return err
+		}
+
+		o.M[f.Name] = v
+	}
+
+	err = t.allFieldsHaveValues(o)
 
 	if err != nil {
 		return err
 	}
 
-	t.Storage.AddObject(*object)
+	err = t.isUnique(o)
 
 	if err != nil {
 		return err
 	}
 
-	t.Index.UpdateIndex(*object)
+	t.Storage.AddObject(*o)
+
+	if err != nil {
+		return err
+	}
+
+	t.Index.UpdateIndex(*o)
 
 	return nil
 }
@@ -326,8 +381,14 @@ func (t *Table) Remove(object *object.Object) error {
 
 func (t *Table) FindExisting(object map[string]interface{}) (int64, error) {
 	for fieldName, f := range t.Config.Fields {
+		value, err := idbutil.InterfaceToDBType(object[fieldName], f)
+
+		if err != nil {
+			return 0, err
+		}
+
 		if f.Indexed && f.Unique {
-			indexElements := t.Index.Equal(fieldName, util.InterfaceToString(object[fieldName]))
+			indexElements := t.Index.Equal(fieldName, value)
 
 			if len(indexElements) > 0 {
 				return indexElements[0], nil
@@ -354,147 +415,26 @@ func (t *Table) and(objects object.Objects, otherObjects object.Objects) object.
 }
 
 func (t *Table) Sort(o object.Objects, fieldName string, additionalFields AdditionalFields, direction request.SortDirection) (object.Objects, error) {
-	f := t.Config.Fields[fieldName]
+	gsort.Slice(o, func(i, j int) bool {
+		iv := additionalFields[o[i]][fieldName]
+		jv := additionalFields[o[j]][fieldName]
 
-	switch f.Type {
-	case field.TEXT:
-		return t.sortString(o, fieldName, direction, nil), nil
-	case field.NUMBER:
-		return t.sortFloat(o, fieldName, direction, nil), nil
-	case field.BOOL:
-		return t.sortBoolean(o, fieldName, direction, nil), nil
-	default:
-		if len(o) > 0 {
-			sampleValue := additionalFields[o[0]][fieldName]
-
-			_, isText := sampleValue.(string)
-
-			if isText {
-				return t.sortString(o, fieldName, direction, additionalFields), nil
-			}
-
-			_, isNumber := sampleValue.(float64)
-
-			if isNumber {
-				return t.sortFloat(o, fieldName, direction, additionalFields), nil
-			}
-
-			_, isBoolean := sampleValue.(bool)
-
-			if isBoolean {
-				return t.sortBoolean(o, fieldName, direction, additionalFields), nil
-			}
-		} else {
-			return o, nil
+		if iv == nil {
+			iv = t.Index.GetValue(fieldName, o[i])
 		}
 
-		return o, e.CannotSortType()
-	}
-}
+		if jv == nil {
+			jv = t.Index.GetValue(fieldName, o[j])
+		}
 
-func (t *Table) sortString(o object.Objects, fieldName string, direction request.SortDirection, additionalFields AdditionalFields) object.Objects {
-	switch direction {
-	case request.ASC:
-		gsort.Slice(o, func(i, j int) bool {
-			iv := ""
-			jv := ""
+		if iv == nil || jv == nil {
+			fmt.Println("F")
+		}
 
-			if additionalFields != nil {
-				iv = additionalFields[o[i]][fieldName].(string)
-				jv = additionalFields[o[j]][fieldName].(string)
-			} else {
-				iv = t.Index.GetValue(fieldName, o[i])
-				jv = t.Index.GetValue(fieldName, o[j])
-			}
+		return direction == request.ASC && iv.Smaller(jv)
+	})
 
-			return iv < jv
-		})
-	case request.DESC:
-		gsort.Slice(o, func(i, j int) bool {
-			iv := ""
-			jv := ""
-
-			if additionalFields != nil {
-				iv = additionalFields[o[i]][fieldName].(string)
-				jv = additionalFields[o[j]][fieldName].(string)
-			} else {
-				iv = t.Index.GetValue(fieldName, o[i])
-				jv = t.Index.GetValue(fieldName, o[j])
-			}
-
-			return iv > jv
-		})
-	}
-
-	return o
-}
-
-func (t *Table) sortFloat(o object.Objects, fieldName string, direction request.SortDirection, additionalFields AdditionalFields) object.Objects {
-	switch direction {
-	case request.ASC:
-		gsort.Slice(o, func(i, j int) bool {
-			var iv float64 = 0
-			var jv float64 = 0
-
-			if additionalFields != nil {
-				iv = additionalFields[o[i]][fieldName].(float64)
-				jv = additionalFields[o[j]][fieldName].(float64)
-			} else {
-				iv, _ = util.StringToNumber(t.Index.GetValue(fieldName, o[i]))
-				jv, _ = util.StringToNumber(t.Index.GetValue(fieldName, o[j]))
-			}
-
-			return iv < jv
-		})
-	case request.DESC:
-		gsort.Slice(o, func(i, j int) bool {
-			var iv float64 = 0
-			var jv float64 = 0
-
-			if additionalFields != nil {
-				iv = additionalFields[o[i]][fieldName].(float64)
-				jv = additionalFields[o[j]][fieldName].(float64)
-			} else {
-				iv, _ = util.StringToNumber(t.Index.GetValue(fieldName, o[i]))
-				jv, _ = util.StringToNumber(t.Index.GetValue(fieldName, o[j]))
-			}
-
-			return iv > jv
-		})
-	}
-
-	return o
-}
-
-func (t *Table) sortBoolean(o object.Objects, fieldName string, direction request.SortDirection, additionalFields AdditionalFields) object.Objects {
-	switch direction {
-	case request.ASC:
-		gsort.Slice(o, func(i, j int) bool {
-			iv := false
-
-			if additionalFields != nil {
-				iv = additionalFields[o[i]][fieldName].(bool)
-			} else {
-				iv = t.Index.GetValue(fieldName, o[i]) == "true"
-			}
-
-			return iv
-		})
-	case request.DESC:
-		gsort.Slice(o, func(i, j int) bool {
-			iv := false
-
-			if additionalFields != nil {
-				iv = additionalFields[o[i]][fieldName].(bool)
-			} else {
-				iv = t.Index.GetValue(fieldName, o[i]) == "true"
-			}
-
-			return !iv
-		})
-	}
-
-	return o
+	return o, nil
 }
 
 func (t *Table) SkipAndLimit(objects object.Objects, skip *int64, limit *int64) object.Objects {
@@ -530,7 +470,7 @@ func (t *Table) SkipAndLimit(objects object.Objects, skip *int64, limit *int64) 
 func (t *Table) isUnique(o *object.Object) error {
 	for fieldName, f := range t.Config.Fields {
 		if f.Unique {
-			if len(t.Index.Equal(fieldName, util.InterfaceToString(o.M[fieldName]))) > 0 {
+			if len(t.Index.Equal(fieldName, o.M[fieldName])) > 0 {
 				return e.FoundExistingObjectWithField(fieldName)
 			}
 		}
@@ -542,10 +482,10 @@ func (t *Table) isUnique(o *object.Object) error {
 
 		for _, fieldName := range fieldNames {
 			if first {
-				objects = t.Index.Equal(fieldName, util.InterfaceToString(o.M[fieldName]))
+				objects = t.Index.Equal(fieldName, o.M[fieldName])
 				first = false
 			} else {
-				objects = t.and(objects, t.Index.Equal(fieldName, util.InterfaceToString(o.M[fieldName])))
+				objects = t.and(objects, t.Index.Equal(fieldName, o.M[fieldName]))
 
 				if len(objects) == 0 {
 					break
@@ -571,11 +511,11 @@ func (t *Table) allFieldsHaveValues(o *object.Object) error {
 	return nil
 }
 
-func (t *Table) andEqual(andObjects object.Objects, field string, value string) object.Objects {
+func (t *Table) andEqual(andObjects object.Objects, field string, value dbtype.DBType) object.Objects {
 	results := object.Objects{}
 
 	for _, andObject := range andObjects {
-		if t.Index.GetValue(field, andObject) == value {
+		if t.Index.GetValue(field, andObject).Equal(value) {
 			results = append(results, andObject)
 		}
 	}
@@ -583,11 +523,11 @@ func (t *Table) andEqual(andObjects object.Objects, field string, value string) 
 	return results
 }
 
-func (t *Table) andNot(andObjects object.Objects, field string, value string) object.Objects {
+func (t *Table) andNot(andObjects object.Objects, field string, value dbtype.DBType) object.Objects {
 	results := object.Objects{}
 
 	for _, andObject := range andObjects {
-		if t.Index.GetValue(field, andObject) != value {
+		if t.Index.GetValue(field, andObject).Not(value) {
 			results = append(results, andObject)
 		}
 	}
@@ -599,7 +539,7 @@ func (t *Table) andMatch(andObjects object.Objects, field string, r regexp.Regex
 	results := object.Objects{}
 
 	for _, andObject := range andObjects {
-		if r.MatchString(t.Index.GetValue(field, andObject)) {
+		if t.Index.GetValue(field, andObject).Matches(r) {
 			results = append(results, andObject)
 		}
 	}
@@ -607,98 +547,36 @@ func (t *Table) andMatch(andObjects object.Objects, field string, r regexp.Regex
 	return results
 }
 
-func (t *Table) andSmaller(andObjects object.Objects, field string, value string, parseNumber bool) (object.Objects, error) {
+func (t *Table) andSmaller(andObjects object.Objects, field string, value dbtype.DBType) (object.Objects, error) {
 	results := object.Objects{}
 
 	for _, andObject := range andObjects {
-		if parseNumber {
-			valueInt, err := util.StringToNumber(value)
-
-			if err != nil {
-				return nil, err
-			}
-
-			andObjectValueInt, err := util.StringToNumber(t.Index.GetValue(field, andObject))
-
-			if err != nil {
-				return nil, err
-			}
-
-			if andObjectValueInt < valueInt {
-				results = append(results, andObject)
-			}
-		} else {
-			if t.Index.GetValue(field, andObject) < value {
-				results = append(results, andObject)
-			}
+		if t.Index.GetValue(field, andObject).Smaller(value) {
+			results = append(results, andObject)
 		}
 	}
 
 	return results, nil
 }
 
-func (t *Table) andLarger(andObjects object.Objects, field string, value string, parseNumber bool) (object.Objects, error) {
+func (t *Table) andLarger(andObjects object.Objects, field string, value dbtype.DBType) (object.Objects, error) {
 	results := object.Objects{}
 
 	for _, andObject := range andObjects {
-		if parseNumber {
-			valueInt, err := util.StringToNumber(value)
-
-			if err != nil {
-				return nil, err
-			}
-
-			andObjectValueInt, err := util.StringToNumber(t.Index.GetValue(field, andObject))
-
-			if err != nil {
-				return nil, err
-			}
-
-			if andObjectValueInt > valueInt {
-				results = append(results, andObject)
-			}
-		} else {
-			if t.Index.GetValue(field, andObject) > value {
-				results = append(results, andObject)
-			}
+		if t.Index.GetValue(field, andObject).Larger(value) {
+			results = append(results, andObject)
 		}
 	}
 
 	return results, nil
 }
 
-func (t *Table) andBetween(andObjects object.Objects, field string, smaller string, larger string, parseNumber bool) (object.Objects, error) {
+func (t *Table) andBetween(andObjects object.Objects, field string, smaller dbtype.DBType, larger dbtype.DBType) (object.Objects, error) {
 	results := object.Objects{}
 
 	for _, andObject := range andObjects {
-		if parseNumber {
-			smallerInt, err := util.StringToNumber(smaller)
-
-			if err != nil {
-				return nil, err
-			}
-
-			largerInt, err := util.StringToNumber(larger)
-
-			if err != nil {
-				return nil, err
-			}
-
-			andObjectValueInt, err := util.StringToNumber(t.Index.GetValue(field, andObject))
-
-			if err != nil {
-				return nil, err
-			}
-
-			if andObjectValueInt > smallerInt && andObjectValueInt < largerInt {
-				results = append(results, andObject)
-			}
-		} else {
-			andObjectValue := t.Index.GetValue(field, andObject)
-
-			if andObjectValue > smaller && andObjectValue < larger {
-				results = append(results, andObject)
-			}
+		if t.Index.GetValue(field, andObject).Between(smaller, larger) {
+			results = append(results, andObject)
 		}
 	}
 
@@ -719,4 +597,50 @@ func (t *Table) removeDuplicates(o object.Objects) object.Objects {
 	}
 
 	return results
+}
+
+func (t *Table) InterfaceMapToObject(m map[string]interface{}) (*object.Object, error) {
+	o := object.Object{
+		M: map[string]dbtype.DBType{},
+	}
+
+	for _, f := range t.Config.Fields {
+		i, ok := m[f.Name]
+
+		if !ok {
+			continue
+		}
+
+		v, err := idbutil.InterfaceToDBType(i, f)
+
+		if err != nil {
+			return nil, err
+		}
+
+		o.M[f.Name] = v
+	}
+
+	return &o, nil
+}
+
+func (t *Table) ObjectToInterfaceMap(o object.Object) (map[string]interface{}, error) {
+	m := map[string]interface{}{}
+
+	for _, f := range t.Config.Fields {
+		v, ok := o.M[f.Name]
+
+		if !ok {
+			continue
+		}
+
+		i, err := idbutil.DBTypeToInterface(v, f)
+
+		if err != nil {
+			return nil, err
+		}
+
+		m[f.Name] = i
+	}
+
+	return m, nil
 }

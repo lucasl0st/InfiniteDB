@@ -30,10 +30,6 @@ func CouldNotFindObjectWithAtLeastOneIndexedAndUniqueValue() error {
 	return errors.New("could not find object with at least one indexed and unique value")
 }
 
-func CannotSortType() error {
-	return errors.New("cannot sort type")
-}
-
 func FoundExistingObjectWithField(fieldName string) error {
 	return errors.New(fmt.Sprintf("found existing object with field %s", fieldName))
 }
@@ -44,4 +40,8 @@ func FoundExistingObjectWithCombinedUniques() error {
 
 func ObjectDoesNotHaveValueForField(fieldName string) error {
 	return errors.New(fmt.Sprintf("object does not have value for field %s and field cannot be null", fieldName))
+}
+
+func ValueForOperatorMustBeString(operator request.Operator) error {
+	return errors.New(fmt.Sprintf("value must be string for operator %s", operator))
 }

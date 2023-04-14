@@ -5,7 +5,6 @@
 package server
 
 import (
-	"errors"
 	e "github.com/lucasl0st/InfiniteDB/errors"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/functions"
@@ -76,7 +75,7 @@ func parseQuery(q request.Query) (*table.Query, error) {
 	if query.Where.Value != nil && (query.Where.All != nil || query.Where.Any != nil) ||
 		query.Where.All != nil && (query.Where.Value != nil || query.Where.Any != nil) ||
 		query.Where.Any != nil && (query.Where.Value != nil || query.Where.All != nil) {
-		return nil, errors.New("can only have value, all or any, not in combination")
+		return nil, e.OnlyValueAllOrAny()
 	}
 
 	return &query, nil

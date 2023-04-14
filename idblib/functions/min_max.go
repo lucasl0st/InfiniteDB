@@ -6,10 +6,10 @@ package functions
 
 import (
 	e "github.com/lucasl0st/InfiniteDB/errors"
+	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/object"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
-	"github.com/lucasl0st/InfiniteDB/util"
 )
 
 const fieldNameMax = "max"
@@ -40,13 +40,9 @@ func (m *MinMaxFunction) Run(
 		var v float64
 
 		if additionalFields[o][m.fieldName] != nil {
-			v = additionalFields[o][m.fieldName].(float64)
+			v = additionalFields[o][m.fieldName].(dbtype.Number).ToFloat64()
 		} else {
-			v, err = util.StringToNumber(t.Index.GetValue(m.fieldName, o))
-
-			if err != nil {
-				return nil, nil, err
-			}
+			v = t.Index.GetValue(m.fieldName, o).(dbtype.Number).ToFloat64()
 		}
 
 		if m.Max {
@@ -62,10 +58,10 @@ func (m *MinMaxFunction) Run(
 
 	for _, o := range objects {
 		if additionalFields[o] == nil {
-			additionalFields[o] = make(map[string]interface{})
+			additionalFields[o] = make(map[string]dbtype.DBType)
 		}
 
-		additionalFields[o][m.as] = r
+		additionalFields[o][m.as] = dbtype.NumberFromFloat64(r)
 	}
 
 	return objects, additionalFields, nil

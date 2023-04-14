@@ -6,6 +6,7 @@ package functions
 
 import (
 	e "github.com/lucasl0st/InfiniteDB/errors"
+	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/object"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
 )
@@ -33,19 +34,19 @@ func (l *LevenshteinFunction) Run(
 	str1 := []rune(l.value)
 
 	for _, o := range objects {
-		str2 := ""
+		var str2 dbtype.Text
 
 		if additionalFields[o][l.fieldName] != nil {
-			str2 = additionalFields[o][l.fieldName].(string)
+			str2 = additionalFields[o][l.fieldName].(dbtype.Text)
 		} else {
-			str2 = table.Index.GetValue(l.fieldName, o)
+			str2 = table.Index.GetValue(l.fieldName, o).(dbtype.Text)
 		}
 
 		if additionalFields[o] == nil {
-			additionalFields[o] = make(map[string]interface{})
+			additionalFields[o] = make(map[string]dbtype.DBType)
 		}
 
-		additionalFields[o][l.as] = float64(l.levenshtein(str1, []rune(str2)))
+		additionalFields[o][l.as] = dbtype.NumberFromFloat64(float64(l.levenshtein(str1, []rune(str2.ToString()))))
 	}
 
 	return objects, additionalFields, nil

@@ -6,9 +6,10 @@ package functions
 
 import (
 	e "github.com/lucasl0st/InfiniteDB/errors"
+	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/object"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
-	"github.com/lucasl0st/InfiniteDB/util"
+	"strconv"
 	"strings"
 )
 
@@ -39,10 +40,10 @@ func (m *MathFunction) Run(
 		}
 
 		if additionalFields[o] == nil {
-			additionalFields[o] = make(map[string]interface{})
+			additionalFields[o] = make(map[string]dbtype.DBType)
 		}
 
-		additionalFields[o][m.as] = result
+		additionalFields[o][m.as] = dbtype.NumberFromFloat64(result)
 	}
 
 	return objects, additionalFields, nil
@@ -70,7 +71,6 @@ func (m *MathFunction) parseParameters(parameters map[string]interface{}) error 
 func (m *MathFunction) runFormula(table *table.Table, object int64, additionalFields table.AdditionalFields) (float64, error) {
 	words := strings.Split(m.formula, " ")
 
-	var err error
 	first := true
 	var result float64 = 0
 
@@ -93,16 +93,12 @@ func (m *MathFunction) runFormula(table *table.Table, object int64, additionalFi
 				fieldName := trimFirstRune(word)
 
 				if additionalFields[object][fieldName] != nil {
-					workingValue = additionalFields[object][fieldName].(float64)
+					workingValue = additionalFields[object][fieldName].(dbtype.Number).ToFloat64()
 				} else {
-					workingValue, err = util.StringToNumber(table.Index.GetValue(fieldName, object))
-
-					if err != nil {
-						return 0, err
-					}
+					workingValue = table.Index.GetValue(fieldName, object).(dbtype.Number).ToFloat64()
 				}
 			} else {
-				f, err := util.StringToNumber(word)
+				f, err := strconv.ParseFloat(word, 64)
 
 				if err != nil {
 					return 0, err
