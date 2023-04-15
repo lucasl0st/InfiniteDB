@@ -8,7 +8,7 @@ A scalable database
 
 #### Docker
 
-`docker run -v ./data:/var/lib/infinitedb -p 8080:8080 -d ghcr.io/lucasl0st/infinitedb:latest-unstable`
+`docker run -v ./data:/var/lib/infinitedb -p 8080:8080 -d ghcr.io/lucasl0st/infinitedb:latest`
 
 #### Docker Compose
 
