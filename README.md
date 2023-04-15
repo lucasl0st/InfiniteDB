@@ -19,7 +19,7 @@ A [docker-compose.yml](docker-compose.yml) file is in this repository, just run 
 ##### Install mage
 [https://github.com/magefile/mage](https://github.com/magefile/mage)
 
-#### Clone repo and build
+##### Clone repo and build
 
 ```bash
 git clone https://github.com/lucasl0st/InfiniteDB.git
