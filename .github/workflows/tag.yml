@@ -41,14 +41,14 @@ jobs:
         uses: magefile/mage-action@v2
         with:
           version: latest
-          args: docker_all true
+          args: docker_all true true
 
       # for some reason GHCR is extremely bugged with multiarch images, only supporting single here for now
       - name: Build and push (single arch)
         uses: magefile/mage-action@v2
         with:
           version: latest
-          args: docker_noarch true
+          args: docker_noarch true true
 
   cleanup:
     needs: docker

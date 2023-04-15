@@ -95,7 +95,7 @@ var supportedTargets = []target{
 	},
 }
 
-func Docker_all(push bool) error {
+func Docker_all(push bool, tagLatest bool) error {
 	results, err := buildForOs(osLinux)
 
 	if err != nil {
@@ -139,15 +139,18 @@ func Docker_all(push bool) error {
 
 	for _, image := range dockerImages {
 		if image.multiArch {
-			tag := fmt.Sprintf("%s:%s", image.tag, v)
-			args = append(args, []string{"-t", tag}...)
+			args = append(args, []string{"-t", fmt.Sprintf("%s:%s", image.tag, v)}...)
+
+			if tagLatest {
+				args = append(args, []string{"-t", fmt.Sprintf("%s:%s", image.tag, "latest")}...)
+			}
 		}
 	}
 
 	return sh.RunV("docker", args...)
 }
 
-func Docker_noarch(push bool) error {
+func Docker_noarch(push bool, tagLatest bool) error {
 	//need to build for all linux because docker can run on a different machine than the go compiler
 	err := Build_linux()
 
@@ -179,6 +182,10 @@ func Docker_noarch(push bool) error {
 		if !image.multiArch {
 			tag := fmt.Sprintf("%s:%s", image.tag, v)
 			args = append(args, []string{"-t", tag}...)
+
+			if tagLatest {
+				args = append(args, []string{"-t", fmt.Sprintf("%s:%s", image.tag, "latest")}...)
+			}
 		}
 	}
 

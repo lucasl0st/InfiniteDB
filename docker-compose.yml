@@ -1,7 +1,7 @@
 version: "3"
 services:
   infinitedb:
-    image: ghcr.io/lucasl0st/infinitedb:latest-unstable
+    image: ghcr.io/lucasl0st/infinitedb:latest
     ports:
       - "8080:8080"
     environment:
