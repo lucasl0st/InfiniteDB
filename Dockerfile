@@ -1,9 +1,7 @@
 FROM alpine as builder
 
 ARG TARGETARCH
-
 ARG binary
-RUN if [ -z "$binary" ] ; then echo binary argument not provided ; else echo using binary $binary ; fi
 
 COPY ./"$binary"_"$TARGETARCH" /usr/bin/infinitedb-server
 
