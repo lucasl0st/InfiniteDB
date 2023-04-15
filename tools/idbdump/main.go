@@ -4,8 +4,8 @@
 
 package main
 
-import "fmt"
+import "github.com/lucasl0st/InfiniteDB/tools/idbdump/cmd"
 
 func main() {
-	fmt.Println("hello world")
+	cmd.Execute()
 }
