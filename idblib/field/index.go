@@ -11,6 +11,8 @@ import (
 	"sync"
 )
 
+const InternalObjectIdField = "INTERNAL_OBJECT_ID"
+
 type Index struct {
 	fields      map[string]Field
 	maps        map[string]map[dbtype.DBType][]int64
@@ -30,6 +32,9 @@ func NewIndex(fields map[string]Field) *Index {
 		index.reverseMaps[field.Name] = make(map[int64]dbtype.DBType)
 	}
 
+	index.maps[InternalObjectIdField] = make(map[dbtype.DBType][]int64)
+	index.reverseMaps[InternalObjectIdField] = make(map[int64]dbtype.DBType)
+
 	return index
 }
 
@@ -39,6 +44,8 @@ func (i *Index) Index(o object.Object) {
 			i.add(fieldName, o.M[fieldName], o.Id)
 		}
 	}
+
+	i.add(InternalObjectIdField, dbtype.NumberFromFloat64(float64(o.Id)), o.Id)
 }
 
 func (i *Index) UnIndex(o object.Object) {
@@ -47,6 +54,8 @@ func (i *Index) UnIndex(o object.Object) {
 			i.remove(fieldName, o.M[fieldName], o.Id)
 		}
 	}
+
+	i.remove(InternalObjectIdField, dbtype.NumberFromFloat64(float64(o.Id)), o.Id)
 }
 
 func (i *Index) UpdateIndex(o object.Object) {

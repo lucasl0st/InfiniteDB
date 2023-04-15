@@ -24,7 +24,13 @@ type DeleteDatabaseResponse struct {
 
 type GetDatabaseTablesResponse struct {
 	Name   string
-	Tables []string
+	Tables []GetDatabaseTablesResponseTable
+}
+
+type GetDatabaseTablesResponseTable struct {
+	Name    string
+	Fields  []request.Field
+	Options request.TableOptions
 }
 
 type CreateTableInDatabaseResponse struct {

@@ -28,7 +28,7 @@ func SetupAuthenticationTable(idb *idblib.IDB) error {
 	}
 
 	for _, t := range r.Tables {
-		if t == AuthenticationTable {
+		if t.Name == AuthenticationTable {
 			return nil
 		}
 	}
