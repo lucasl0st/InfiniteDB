@@ -17,9 +17,20 @@ import (
 const binaryName = "infinitedb-server"
 const buildDir = "build"
 
-var dockerImages = []string{
-	"ghcr.io/lucasl0st/infinitedb",
-	"lucasl0st/infinitedb",
+type dockerImage struct {
+	tag       string
+	multiArch bool
+}
+
+var dockerImages = []dockerImage{
+	{
+		tag:       "ghcr.io/lucasl0st/infinitedb",
+		multiArch: false,
+	},
+	{
+		tag:       "lucasl0st/infinitedb",
+		multiArch: true,
+	},
 }
 
 type architecture string
@@ -114,8 +125,7 @@ func Docker_all(push bool) error {
 	platform = strings.TrimSuffix(platform, ",")
 
 	args := []string{
-		"buildx", "build",
-		".",
+		"buildx", "build", ".",
 		"--platform", fmt.Sprint(platform),
 		"--build-arg", fmt.Sprintf("binary=%s", binary),
 		"--provenance", "false",
@@ -128,8 +138,48 @@ func Docker_all(push bool) error {
 	}
 
 	for _, image := range dockerImages {
-		tag := fmt.Sprintf("%s:%s", image, v)
-		args = append(args, []string{"-t", tag}...)
+		if image.multiArch {
+			tag := fmt.Sprintf("%s:%s", image.tag, v)
+			args = append(args, []string{"-t", tag}...)
+		}
+	}
+
+	return sh.RunV("docker", args...)
+}
+
+func Docker_noarch(push bool) error {
+	//need to build for all linux because docker can run on a different machine than the go compiler
+	err := Build_linux()
+
+	if err != nil {
+		return err
+	}
+
+	v, err := version()
+
+	if err != nil {
+		return err
+	}
+
+	binary := fmt.Sprintf("%s/%s_%s_%s", buildDir, binaryName, v, osLinux)
+
+	args := []string{
+		"buildx", "build", ".",
+		"--build-arg", fmt.Sprintf("binary=%s", binary),
+		"--provenance", "false",
+		"--progress", "plain",
+		"--no-cache",
+	}
+
+	if push {
+		args = append(args, "--push")
+	}
+
+	for _, image := range dockerImages {
+		if !image.multiArch {
+			tag := fmt.Sprintf("%s:%s", image.tag, v)
+			args = append(args, []string{"-t", tag}...)
+		}
 	}
 
 	return sh.RunV("docker", args...)
@@ -151,20 +201,7 @@ func targetToDockerPlatform(t target) (*dockerPlatform, error) {
 }
 
 func Build() error {
-	var t *target = nil
-
-	for _, supportedTarget := range supportedTargets {
-		if fmt.Sprint(supportedTarget.Arch) == runtime.GOARCH && fmt.Sprint(supportedTarget.Os) == runtime.GOOS {
-			t = &supportedTarget
-			break
-		}
-	}
-
-	if t == nil {
-		return errors.New("this architecture or operating system is not supported")
-	}
-
-	_, err := build(*t)
+	_, err := buildForRunningArch()
 
 	return err
 }
@@ -223,6 +260,23 @@ func buildForOs(o operating_system) ([]result, error) {
 	}
 
 	return results, nil
+}
+
+func buildForRunningArch() (*result, error) {
+	var t *target = nil
+
+	for _, supportedTarget := range supportedTargets {
+		if fmt.Sprint(supportedTarget.Arch) == runtime.GOARCH && fmt.Sprint(supportedTarget.Os) == runtime.GOOS {
+			t = &supportedTarget
+			break
+		}
+	}
+
+	if t == nil {
+		return nil, errors.New("this architecture or operating system is not supported")
+	}
+
+	return build(*t)
 }
 
 func build(t target) (*result, error) {
