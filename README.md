@@ -16,12 +16,15 @@ A [docker-compose.yml](docker-compose.yml) file is in this repository, just run 
 
 #### Compiling from source
 
-```
+##### Install mage
+[https://github.com/magefile/mage](https://github.com/magefile/mage)
+
+#### Clone repo and build
+
+```bash
 git clone https://github.com/lucasl0st/InfiniteDB.git
 
-go build -o infinitedb-server
-
-./infinitedb-server
+mage build
 ```
 
 ### Environment variables
