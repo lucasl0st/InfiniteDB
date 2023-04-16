@@ -5,6 +5,7 @@
 package server
 
 import (
+	"encoding/json"
 	e "github.com/lucasl0st/InfiniteDB/errors"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/functions"
@@ -90,7 +91,7 @@ func parseFunctions(f []request.Function) ([]table.FunctionWithParameters, error
 		if function.Parameters != nil {
 			ff.Parameters = *function.Parameters
 		} else {
-			ff.Parameters = make(map[string]interface{})
+			ff.Parameters = make(map[string]json.RawMessage)
 		}
 
 		switch function.Function {
@@ -100,8 +101,6 @@ func parseFunctions(f []request.Function) ([]table.FunctionWithParameters, error
 			ff.Function = &functions.MinMaxFunction{Max: true}
 		case "min":
 			ff.Function = &functions.MinMaxFunction{Max: false}
-		case "math":
-			ff.Function = &functions.MathFunction{}
 		case "distance":
 			ff.Function = &functions.DistanceFunction{}
 		default:

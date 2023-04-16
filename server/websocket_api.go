@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/websocket"
 	e "github.com/lucasl0st/InfiniteDB/errors"
 	"github.com/lucasl0st/InfiniteDB/idblib"
+	"github.com/lucasl0st/InfiniteDB/idblib/util"
 	"github.com/lucasl0st/InfiniteDB/request"
 	"net/http"
 	"time"
@@ -47,17 +48,20 @@ func (w *WebsocketApi) handler(c *gin.Context, rw http.ResponseWriter, r *http.R
 
 	conn.SetReadLimit(w.readLimit)
 
-	w.send(conn, 0, gin.H{
+	w.send(conn, 0, util.InterfaceMapToJsonRawMap(gin.H{
 		"message":          "HELO",
 		"status":           http.StatusOK,
 		"database_version": VERSION,
-	})
+	}))
 
 	for {
 		_, bytes, err := conn.ReadMessage()
 
 		if err != nil {
-			closed := w.send(conn, 0, gin.H{"status": http.StatusInternalServerError, "message": "failed to read message"})
+			closed := w.send(conn, 0, util.InterfaceMapToJsonRawMap(gin.H{
+				"status":  http.StatusInternalServerError,
+				"message": "failed to read message",
+			}))
 
 			if closed {
 				return
@@ -71,14 +75,19 @@ func (w *WebsocketApi) handler(c *gin.Context, rw http.ResponseWriter, r *http.R
 		}
 
 		if body != nil {
-			requestId := (*body)["requestId"]
+			m := util.JsonRawMapToInterfaceMap(*body)
+
+			requestId := m["requestId"]
 
 			if requestId != nil {
-				if w.methodHandler(conn, c.ClientIP(), int64(requestId.(float64)), *body) {
+				if w.methodHandler(conn, c.ClientIP(), int64(requestId.(float64)), m, *body) {
 					return
 				}
 			} else {
-				if w.send(conn, 0, gin.H{"status": http.StatusInternalServerError, "message": "every request must have a requestId"}) {
+				if w.send(conn, 0, util.InterfaceMapToJsonRawMap(gin.H{
+					"status":  http.StatusInternalServerError,
+					"message": "every request must have a requestId",
+				})) {
 					return
 				}
 			}
@@ -86,19 +95,22 @@ func (w *WebsocketApi) handler(c *gin.Context, rw http.ResponseWriter, r *http.R
 	}
 }
 
-func (w *WebsocketApi) getBody(conn *websocket.Conn, bytes []byte) (*map[string]interface{}, bool) {
-	var r map[string]interface{}
+func (w *WebsocketApi) getBody(conn *websocket.Conn, bytes []byte) (*map[string]json.RawMessage, bool) {
+	var r map[string]json.RawMessage
 	err := json.Unmarshal(bytes, &r)
 
 	if err != nil {
-		return nil, w.send(conn, 0, gin.H{"status": http.StatusInternalServerError, "message": "failed to parse JSON"})
+		return nil, w.send(conn, 0, util.InterfaceMapToJsonRawMap(gin.H{
+			"status":  http.StatusInternalServerError,
+			"message": "failed to parse JSON",
+		}))
 	}
 
 	return &r, false
 }
 
-func (w *WebsocketApi) send(conn *websocket.Conn, requestId int64, m map[string]interface{}) bool {
-	m["requestId"] = requestId
+func (w *WebsocketApi) send(conn *websocket.Conn, requestId int64, m map[string]json.RawMessage) bool {
+	m["requestId"] = util.Int64ToJsonRaw(requestId)
 
 	err := conn.WriteJSON(m)
 
@@ -116,39 +128,48 @@ func (w *WebsocketApi) send(conn *websocket.Conn, requestId int64, m map[string]
 	return false
 }
 
-func (w *WebsocketApi) methodHandler(conn *websocket.Conn, clientIp string, requestId int64, r map[string]interface{}) bool {
-	method := r["method"]
-
+func (w *WebsocketApi) methodHandler(
+	conn *websocket.Conn,
+	clientIp string,
+	requestId int64,
+	m map[string]interface{},
+	r map[string]json.RawMessage,
+) bool {
 	closed := false
 	status := 0
 	since := time.Now()
+
+	method := m["method"]
 
 	if method != nil {
 		switch method.(string) {
 		case "getDatabases":
 			closed, status = w.getDatabasesHandler(conn, requestId)
 		case "createDatabase":
-			closed, status = w.createDatabaseHandler(conn, requestId, r)
+			closed, status = w.createDatabaseHandler(conn, requestId, m)
 		case "deleteDatabase":
-			closed, status = w.deleteDatabaseHandler(conn, requestId, r)
+			closed, status = w.deleteDatabaseHandler(conn, requestId, m)
 		case "getDatabase":
-			closed, status = w.getDatabaseHandler(conn, requestId, r)
+			closed, status = w.getDatabaseHandler(conn, requestId, m)
 		case "getDatabaseTables":
-			closed, status = w.getDatabaseTablesHandler(conn, requestId, r)
+			closed, status = w.getDatabaseTablesHandler(conn, requestId, m)
 		case "createTableInDatabase":
-			closed, status = w.createTableInDatabaseHandler(conn, requestId, r)
+			closed, status = w.createTableInDatabaseHandler(conn, requestId, m)
 		case "deleteTableInDatabase":
-			closed, status = w.deleteTableInDatabaseHandler(conn, requestId, r)
+			closed, status = w.deleteTableInDatabaseHandler(conn, requestId, m)
 		case "getFromDatabaseTable":
-			closed, status = w.getFromDatabaseTableHandler(conn, requestId, r)
+			closed, status = w.getFromDatabaseTableHandler(conn, requestId, m, r)
 		case "insertToDatabaseTable":
-			closed, status = w.insertToDatabaseTableHandler(conn, requestId, r)
+			closed, status = w.insertToDatabaseTableHandler(conn, requestId, m, r)
 		case "removeFromDatabaseTable":
-			closed, status = w.removeFromDatabaseTableHandler(conn, requestId, r)
+			closed, status = w.removeFromDatabaseTableHandler(conn, requestId, m, r)
 		case "updateInDatabaseTable":
-			closed, status = w.updateInDatabaseTableHandler(conn, requestId, r)
+			closed, status = w.updateInDatabaseTableHandler(conn, requestId, m, r)
 		default:
-			closed = w.send(conn, requestId, gin.H{"status": http.StatusInternalServerError, "message": "method not found"})
+			closed = w.send(conn, requestId, util.InterfaceMapToJsonRawMap(gin.H{
+				"status":  http.StatusInternalServerError,
+				"message": "method not found",
+			}))
 			status = http.StatusInternalServerError
 		}
 
@@ -156,7 +177,10 @@ func (w *WebsocketApi) methodHandler(conn *websocket.Conn, clientIp string, requ
 			w.logHandler(method.(string), status, since, clientIp, requestId)
 		}
 	} else {
-		closed = w.send(conn, requestId, gin.H{"status": http.StatusInternalServerError, "message": "no method specified"})
+		closed = w.send(conn, requestId, util.InterfaceMapToJsonRawMap(gin.H{
+			"status":  http.StatusInternalServerError,
+			"message": "no method specified",
+		}))
 	}
 
 	return closed
@@ -402,8 +426,13 @@ func (w *WebsocketApi) deleteTableInDatabaseHandler(conn *websocket.Conn, reques
 	return w.sendResults(conn, requestId, &m, err)
 }
 
-func (w *WebsocketApi) getFromDatabaseTableHandler(conn *websocket.Conn, requestId int64, r map[string]interface{}) (bool, int) {
-	name, isString := r["name"].(string)
+func (w *WebsocketApi) getFromDatabaseTableHandler(
+	conn *websocket.Conn,
+	requestId int64,
+	m map[string]interface{},
+	r map[string]json.RawMessage,
+) (bool, int) {
+	name, isString := m["name"].(string)
 
 	if !isString {
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("name"))
@@ -415,7 +444,7 @@ func (w *WebsocketApi) getFromDatabaseTableHandler(conn *websocket.Conn, request
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	tableName, isString := r["tableName"].(string)
+	tableName, isString := m["tableName"].(string)
 
 	if !isString {
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("tableName"))
@@ -427,14 +456,8 @@ func (w *WebsocketApi) getFromDatabaseTableHandler(conn *websocket.Conn, request
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	r, isMap := r["request"].(map[string]interface{})
-
-	if !isMap {
-		return w.sendResults(conn, requestId, nil, e.IsNotAMap("request"))
-	}
-
 	var req request.Request
-	err = toStruct(r, &req)
+	err = toStruct(r["request"], &req)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -452,17 +475,22 @@ func (w *WebsocketApi) getFromDatabaseTableHandler(conn *websocket.Conn, request
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	m, err := toMap(results)
+	rm, err := toMap(results)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	return w.sendResults(conn, requestId, &m, err)
+	return w.sendResults(conn, requestId, &rm, err)
 }
 
-func (w *WebsocketApi) insertToDatabaseTableHandler(conn *websocket.Conn, requestId int64, r map[string]interface{}) (bool, int) {
-	name, isString := r["name"].(string)
+func (w *WebsocketApi) insertToDatabaseTableHandler(
+	conn *websocket.Conn,
+	requestId int64,
+	m map[string]interface{},
+	r map[string]json.RawMessage,
+) (bool, int) {
+	name, isString := m["name"].(string)
 
 	if !isString {
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("name"))
@@ -474,7 +502,7 @@ func (w *WebsocketApi) insertToDatabaseTableHandler(conn *websocket.Conn, reques
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	tableName, isString := r["tableName"].(string)
+	tableName, isString := m["tableName"].(string)
 
 	if !isString {
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("tableName"))
@@ -486,29 +514,35 @@ func (w *WebsocketApi) insertToDatabaseTableHandler(conn *websocket.Conn, reques
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	object, isMap := r["object"].(map[string]interface{})
-
-	if !isMap {
-		return w.sendResults(conn, requestId, nil, e.IsNotAMap("object"))
-	}
-
-	results, err := w.idb.InsertToDatabaseTable(name, tableName, object)
+	var o map[string]json.RawMessage
+	err = toStruct(r["object"], &o)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	m, err := toMap(results)
+	results, err := w.idb.InsertToDatabaseTable(name, tableName, o)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	return w.sendResults(conn, requestId, &m, err)
+	rm, err := toMap(results)
+
+	if err != nil {
+		return w.sendResults(conn, requestId, nil, err)
+	}
+
+	return w.sendResults(conn, requestId, &rm, err)
 }
 
-func (w *WebsocketApi) removeFromDatabaseTableHandler(conn *websocket.Conn, requestId int64, r map[string]interface{}) (bool, int) {
-	name, isString := r["name"].(string)
+func (w *WebsocketApi) removeFromDatabaseTableHandler(
+	conn *websocket.Conn,
+	requestId int64,
+	m map[string]interface{},
+	r map[string]json.RawMessage,
+) (bool, int) {
+	name, isString := m["name"].(string)
 
 	if !isString {
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("name"))
@@ -520,7 +554,7 @@ func (w *WebsocketApi) removeFromDatabaseTableHandler(conn *websocket.Conn, requ
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	tableName, isString := r["tableName"].(string)
+	tableName, isString := m["tableName"].(string)
 
 	if !isString {
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("tableName"))
@@ -530,16 +564,10 @@ func (w *WebsocketApi) removeFromDatabaseTableHandler(conn *websocket.Conn, requ
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
-	}
-
-	r, isMap := r["request"].(map[string]interface{})
-
-	if !isMap {
-		return w.sendResults(conn, requestId, nil, e.IsNotAMap("request"))
 	}
 
 	var req request.Request
-	err = toStruct(r, &req)
+	err = toStruct(r["request"], &req)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -557,17 +585,22 @@ func (w *WebsocketApi) removeFromDatabaseTableHandler(conn *websocket.Conn, requ
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	m, err := toMap(results)
+	rm, err := toMap(results)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	return w.sendResults(conn, requestId, &m, err)
+	return w.sendResults(conn, requestId, &rm, err)
 }
 
-func (w *WebsocketApi) updateInDatabaseTableHandler(conn *websocket.Conn, requestId int64, r map[string]interface{}) (bool, int) {
-	name, isString := r["name"].(string)
+func (w *WebsocketApi) updateInDatabaseTableHandler(
+	conn *websocket.Conn,
+	requestId int64,
+	m map[string]interface{},
+	r map[string]json.RawMessage,
+) (bool, int) {
+	name, isString := m["name"].(string)
 
 	if !isString {
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("name"))
@@ -579,7 +612,7 @@ func (w *WebsocketApi) updateInDatabaseTableHandler(conn *websocket.Conn, reques
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	tableName, isString := r["tableName"].(string)
+	tableName, isString := m["tableName"].(string)
 
 	if !isString {
 		return w.sendResults(conn, requestId, nil, e.IsNotAString("tableName"))
@@ -591,35 +624,39 @@ func (w *WebsocketApi) updateInDatabaseTableHandler(conn *websocket.Conn, reques
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	object, isMap := r["object"].(map[string]interface{})
-
-	if !isMap {
-		return w.sendResults(conn, requestId, nil, e.IsNotAMap("object"))
-	}
-
-	results, err := w.idb.UpdateInDatabaseTable(name, tableName, object)
+	var o map[string]json.RawMessage
+	err = toStruct(r["object"], &o)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	m, err := toMap(results)
+	results, err := w.idb.UpdateInDatabaseTable(name, tableName, o)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	return w.sendResults(conn, requestId, &m, err)
+	rm, err := toMap(results)
+
+	if err != nil {
+		return w.sendResults(conn, requestId, nil, err)
+	}
+
+	return w.sendResults(conn, requestId, &rm, err)
 }
 
-func (w *WebsocketApi) sendResults(conn *websocket.Conn, requestId int64, results *map[string]interface{}, err error) (bool, int) {
+func (w *WebsocketApi) sendResults(conn *websocket.Conn, requestId int64, results *map[string]json.RawMessage, err error) (bool, int) {
 	if err == nil && results != nil {
 		r := *results
-		r["status"] = http.StatusOK
+		r["status"] = util.InterfaceToJsonRaw(http.StatusOK)
 
 		return w.send(conn, requestId, r), http.StatusOK
 	} else {
-		return w.send(conn, requestId, gin.H{"status": http.StatusInternalServerError, "message": fmt.Sprint(err)}), http.StatusInternalServerError
+		return w.send(conn, requestId, util.InterfaceMapToJsonRawMap(gin.H{
+			"status":  http.StatusInternalServerError,
+			"message": fmt.Sprint(err),
+		})), http.StatusInternalServerError
 	}
 }
 

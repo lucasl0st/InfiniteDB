@@ -5,11 +5,11 @@
 package functions
 
 import (
-	e "github.com/lucasl0st/InfiniteDB/errors"
+	"encoding/json"
 	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
-	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/object"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
+	"github.com/lucasl0st/InfiniteDB/idblib/util"
 )
 
 const fieldNameMax = "max"
@@ -25,7 +25,7 @@ func (m *MinMaxFunction) Run(
 	t *table.Table,
 	objects object.Objects,
 	additionalFields table.AdditionalFields,
-	parameters map[string]interface{},
+	parameters map[string]json.RawMessage,
 ) (object.Objects, table.AdditionalFields, error) {
 	err := m.parseParameters(t, parameters)
 
@@ -33,24 +33,28 @@ func (m *MinMaxFunction) Run(
 		return nil, nil, err
 	}
 
-	var r float64
-	r = 0
+	var r dbtype.DBType
 
 	for _, o := range objects {
-		var v float64
+		var v dbtype.DBType
 
 		if additionalFields[o][m.fieldName] != nil {
-			v = additionalFields[o][m.fieldName].(dbtype.Number).ToFloat64()
+			v = additionalFields[o][m.fieldName]
 		} else {
-			v = t.Index.GetValue(m.fieldName, o).(dbtype.Number).ToFloat64()
+			v = t.Index.GetValue(m.fieldName, o)
+		}
+
+		if r == nil {
+			r = v
+			continue
 		}
 
 		if m.Max {
-			if v > r {
+			if v.Larger(r) {
 				r = v
 			}
 		} else {
-			if v < r {
+			if v.Smaller(r) {
 				r = v
 			}
 		}
@@ -61,40 +65,34 @@ func (m *MinMaxFunction) Run(
 			additionalFields[o] = make(map[string]dbtype.DBType)
 		}
 
-		additionalFields[o][m.as] = dbtype.NumberFromFloat64(r)
+		additionalFields[o][m.as] = r
 	}
 
 	return objects, additionalFields, nil
 }
 
-func (m *MinMaxFunction) parseParameters(t *table.Table, parameters map[string]interface{}) error {
-	fieldName, ok := parameters["fieldName"].(string)
+func (m *MinMaxFunction) parseParameters(t *table.Table, parameters map[string]json.RawMessage) error {
+	fieldName, err := util.JsonRawToString(parameters["fieldName"])
 
-	if !ok {
-		return e.IsNotAString("fieldName in min/max function")
+	if err != nil {
+		return err
 	}
 
-	f, ok := t.Config.Fields[fieldName]
+	var as string
 
-	if !ok {
-		return e.CannotFindField(fieldName)
+	if m.Max {
+		as = fieldNameMax
+	} else {
+		as = fieldNameMin
 	}
 
-	if f.Type != field.NUMBER {
-		return e.FieldHasUnsupportedTypeForThisFunction(fieldName)
+	asP, err := util.JsonRawToString(parameters["as"])
+
+	if asP != nil && len(*asP) > 0 && err == nil {
+		as = *asP
 	}
 
-	as, ok := parameters["as"].(string)
-
-	if !ok {
-		if m.Max {
-			as = fieldNameMax
-		} else {
-			as = fieldNameMin
-		}
-	}
-
-	m.fieldName = fieldName
+	m.fieldName = *fieldName
 	m.as = as
 
 	return nil

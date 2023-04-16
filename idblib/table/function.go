@@ -5,6 +5,7 @@
 package table
 
 import (
+	"encoding/json"
 	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/object"
 )
@@ -16,6 +17,6 @@ type Function interface {
 		t *Table,
 		objects object.Objects,
 		additionalFields AdditionalFields,
-		parameters map[string]interface{},
+		parameters map[string]json.RawMessage,
 	) (object.Objects, AdditionalFields, error)
 }

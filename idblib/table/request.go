@@ -4,7 +4,10 @@
 
 package table
 
-import "github.com/lucasl0st/InfiniteDB/request"
+import (
+	"encoding/json"
+	"github.com/lucasl0st/InfiniteDB/request"
+)
 
 type Request struct {
 	Query     *Query
@@ -23,5 +26,5 @@ type Query struct {
 
 type FunctionWithParameters struct {
 	Function   Function
-	Parameters map[string]interface{}
+	Parameters map[string]json.RawMessage
 }

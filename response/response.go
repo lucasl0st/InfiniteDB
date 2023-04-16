@@ -5,6 +5,7 @@
 package response
 
 import (
+	"encoding/json"
 	"github.com/lucasl0st/InfiniteDB/request"
 )
 
@@ -48,13 +49,13 @@ type DeleteTableInDatabaseResponse struct {
 type GetFromDatabaseTableResponse struct {
 	Name      string
 	TableName string
-	Results   []map[string]interface{}
+	Results   []map[string]json.RawMessage
 }
 
 type InsertToDatabaseTableResponse struct {
 	Name      string
 	TableName string
-	Object    map[string]interface{}
+	Object    map[string]json.RawMessage
 }
 
 type RemoveFromDatabaseTableResponse struct {
@@ -66,7 +67,7 @@ type RemoveFromDatabaseTableResponse struct {
 type UpdateInDatabaseTableResponse struct {
 	Name      string
 	TableName string
-	Object    map[string]interface{}
+	Object    map[string]json.RawMessage
 }
 
 type GetDatabaseResponse struct {

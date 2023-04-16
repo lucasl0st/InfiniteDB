@@ -4,7 +4,11 @@
 
 package dbtype
 
-import "regexp"
+import (
+	"encoding/json"
+	"fmt"
+	"regexp"
+)
 
 type Text struct {
 	s    string
@@ -56,6 +60,10 @@ func (a Text) ToString() string {
 	}
 
 	return a.s
+}
+
+func (a Text) ToJsonRaw() json.RawMessage {
+	return json.RawMessage(fmt.Sprintf("\"%s\"", a.ToString()))
 }
 
 func (a Text) IsNull() bool {

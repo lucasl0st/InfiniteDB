@@ -5,10 +5,12 @@
 package dump
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/lucasl0st/InfiniteDB/client"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
+	idbutil "github.com/lucasl0st/InfiniteDB/idblib/util"
 	"github.com/lucasl0st/InfiniteDB/request"
 	"github.com/lucasl0st/InfiniteDB/response"
 	"github.com/lucasl0st/InfiniteDB/util"
@@ -106,8 +108,6 @@ func (dump *Dump) table(d string, t response.GetDatabaseTablesResponseTable) err
 		}
 
 		dump.r.ProgressEnd()
-	} else {
-		fmt.Println(fmt.Sprintf("table %s in database %s has no objects", t.Name, d))
 	}
 
 	return nil
@@ -144,9 +144,9 @@ func (dump *Dump) getMaxObjectId(d string, t string) (*int64, error) {
 			Functions: []request.Function{
 				{
 					Function: "max",
-					Parameters: util.Ptr(map[string]interface{}{
-						"fieldName": field.InternalObjectIdField,
-						"as":        as,
+					Parameters: util.Ptr(map[string]json.RawMessage{
+						"fieldName": idbutil.StringToJsonRaw(field.InternalObjectIdField),
+						"as":        idbutil.StringToJsonRaw(as),
 					}),
 				},
 			},
@@ -159,7 +159,9 @@ func (dump *Dump) getMaxObjectId(d string, t string) (*int64, error) {
 	}
 
 	for _, r := range res.Results {
-		max, ok := r[as].(float64)
+		m := idbutil.JsonRawMapToInterfaceMap(r)
+
+		max, ok := m[as].(float64)
 
 		if ok {
 			return util.Ptr(int64(max)), nil
@@ -175,7 +177,7 @@ func (dump *Dump) getObjects(d string, t string, start int64, count int64) ([]Ob
 			Where: &request.Where{
 				Field:    field.InternalObjectIdField,
 				Operator: request.BETWEEN,
-				Value:    fmt.Sprintf("%v_%v", start-1, start+count),
+				Value:    idbutil.StringToJsonRaw(fmt.Sprintf("%v_%v", start-1, start+count)),
 			},
 		},
 	})

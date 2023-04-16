@@ -445,7 +445,7 @@ func (c *Client) GetFromDatabaseTable(name string, tableName string, request req
 	return getFromDatabaseTableResponse, nil
 }
 
-func (c *Client) InsertToDatabaseTable(name string, tableName string, object map[string]interface{}) (response.InsertToDatabaseTableResponse, error) {
+func (c *Client) InsertToDatabaseTable(name string, tableName string, object map[string]json.RawMessage) (response.InsertToDatabaseTableResponse, error) {
 	r := make(map[string]interface{})
 
 	r["method"] = "insertToDatabaseTable"

@@ -5,6 +5,7 @@
 package idblib
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
@@ -344,7 +345,7 @@ func (i *IDB) GetFromDatabaseTable(name string, tableName string, request table.
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	objectsChannel := make(chan []map[string]interface{}, 1)
+	objectsChannel := make(chan []map[string]json.RawMessage, 1)
 	errChannel := make(chan error, 1)
 
 	go func() {
@@ -374,7 +375,7 @@ func (i *IDB) GetFromDatabaseTable(name string, tableName string, request table.
 	}, nil
 }
 
-func (i *IDB) InsertToDatabaseTable(name string, tableName string, object map[string]interface{}) (response.InsertToDatabaseTableResponse, error) {
+func (i *IDB) InsertToDatabaseTable(name string, tableName string, object map[string]json.RawMessage) (response.InsertToDatabaseTableResponse, error) {
 	d := i.databases[name]
 
 	if d == nil {
@@ -446,7 +447,7 @@ func (i *IDB) RemoveFromDatabaseTable(name string, tableName string, request tab
 	}, nil
 }
 
-func (i *IDB) UpdateInDatabaseTable(name string, tableName string, object map[string]interface{}) (response.UpdateInDatabaseTableResponse, error) {
+func (i *IDB) UpdateInDatabaseTable(name string, tableName string, object map[string]json.RawMessage) (response.UpdateInDatabaseTableResponse, error) {
 	d := i.databases[name]
 
 	if d == nil {

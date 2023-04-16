@@ -5,6 +5,8 @@
 package table
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	e "github.com/lucasl0st/InfiniteDB/errors"
 	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
@@ -87,13 +89,17 @@ func (t *Table) Where(w request.Where, andObjects object.Objects) (object.Object
 
 	switch w.Operator {
 	case request.MATCH:
-		s, ok := w.Value.(string)
+		s, err := idbutil.JsonRawToString(w.Value)
 
-		if !ok {
-			return nil, e.ValueForOperatorMustBeString(request.MATCH)
+		if err != nil {
+			return nil, err
 		}
 
-		r, err := regexp.Compile(s)
+		if s == nil {
+			return nil, errors.New("cannot be null for match")
+		}
+
+		r, err := regexp.Compile(*s)
 
 		if err != nil {
 			return nil, err
@@ -105,13 +111,17 @@ func (t *Table) Where(w request.Where, andObjects object.Objects) (object.Object
 			results = t.andMatch(andObjects, w.Field, *r)
 		}
 	case request.BETWEEN:
-		s, ok := w.Value.(string)
+		s, err := idbutil.JsonRawToString(w.Value)
 
-		if !ok {
-			return nil, e.ValueForOperatorMustBeString(request.BETWEEN)
+		if err != nil {
+			return nil, err
 		}
 
-		values := strings.Split(s, "_")
+		if s == nil {
+			return nil, errors.New("cannot be null for between")
+		}
+
+		values := strings.Split(*s, "_")
 
 		if len(values) <= 1 {
 			return nil, e.NotEnoughValuesForOperator(w.Operator)
@@ -135,7 +145,7 @@ func (t *Table) Where(w request.Where, andObjects object.Objects) (object.Object
 			return nil, err
 		}
 	default:
-		v, err := idbutil.InterfaceToDBType(w.Value, f)
+		v, err := idbutil.JsonRawToDBType(w.Value, f)
 
 		if err != nil {
 			return nil, err
@@ -197,7 +207,7 @@ func (t *Table) Query(q Query, andObjects object.Objects, additionalFields Addit
 			nextQuery := &query
 
 			for _, a := range q.Where.All {
-				if a == q.Where.All[0] {
+				if string(a) == string(q.Where.All[0]) {
 					continue
 				}
 
@@ -225,7 +235,7 @@ func (t *Table) Query(q Query, andObjects object.Objects, additionalFields Addit
 			nextQuery := &query
 
 			for _, a := range q.Where.Any {
-				if a == q.Where.Any[0] {
+				if string(a) == string(q.Where.Any[0]) {
 					continue
 				}
 
@@ -286,14 +296,14 @@ func (t *Table) Query(q Query, andObjects object.Objects, additionalFields Addit
 	return objects, additionalFields, nil
 }
 
-func (t *Table) Insert(objectM map[string]interface{}) error {
+func (t *Table) Insert(objectM map[string]json.RawMessage) error {
 	runMiddleware, insert := InsertMiddleware(t, objectM)
 
 	if runMiddleware {
 		return insert()
 	}
 
-	o, err := t.InterfaceMapToObject(objectM)
+	o, err := t.JsonRawMapToObject(objectM)
 
 	if err != nil {
 		return err
@@ -320,7 +330,7 @@ func (t *Table) Insert(objectM map[string]interface{}) error {
 	return nil
 }
 
-func (t *Table) Update(objectM map[string]interface{}) error {
+func (t *Table) Update(objectM map[string]json.RawMessage) error {
 	runMiddleware, update := UpdateMiddleware(t, objectM)
 
 	if runMiddleware {
@@ -342,7 +352,7 @@ func (t *Table) Update(objectM map[string]interface{}) error {
 			continue
 		}
 
-		v, err := idbutil.InterfaceToDBType(updatedValue, f)
+		v, err := idbutil.JsonRawToDBType(updatedValue, f)
 
 		if err != nil {
 			return err
@@ -387,9 +397,9 @@ func (t *Table) Remove(object *object.Object) error {
 	return nil
 }
 
-func (t *Table) FindExisting(object map[string]interface{}) (int64, error) {
+func (t *Table) FindExisting(object map[string]json.RawMessage) (int64, error) {
 	for fieldName, f := range t.Config.Fields {
-		value, err := idbutil.InterfaceToDBType(object[fieldName], f)
+		value, err := idbutil.JsonRawToDBType(object[fieldName], f)
 
 		if err != nil {
 			return 0, err
@@ -477,7 +487,7 @@ func (t *Table) SkipAndLimit(objects object.Objects, skip *int64, limit *int64) 
 
 func (t *Table) isUnique(o *object.Object) error {
 	for fieldName, f := range t.Config.Fields {
-		if f.Unique {
+		if f.Unique && f.Name != field.InternalObjectIdField {
 			if len(t.Index.Equal(fieldName, o.M[fieldName])) > 0 {
 				return e.FoundExistingObjectWithField(fieldName)
 			}
@@ -607,7 +617,7 @@ func (t *Table) removeDuplicates(o object.Objects) object.Objects {
 	return results
 }
 
-func (t *Table) InterfaceMapToObject(m map[string]interface{}) (*object.Object, error) {
+func (t *Table) JsonRawMapToObject(m map[string]json.RawMessage) (*object.Object, error) {
 	o := object.Object{
 		M: map[string]dbtype.DBType{},
 	}
@@ -623,7 +633,7 @@ func (t *Table) InterfaceMapToObject(m map[string]interface{}) (*object.Object, 
 			continue
 		}
 
-		v, err := idbutil.InterfaceToDBType(i, f)
+		v, err := idbutil.JsonRawToDBType(i, f)
 
 		if err != nil {
 			return nil, err
@@ -635,8 +645,8 @@ func (t *Table) InterfaceMapToObject(m map[string]interface{}) (*object.Object, 
 	return &o, nil
 }
 
-func (t *Table) ObjectToInterfaceMap(o object.Object) (map[string]interface{}, error) {
-	m := map[string]interface{}{}
+func (t *Table) ObjectToJsonRawMap(o object.Object) (map[string]json.RawMessage, error) {
+	m := map[string]json.RawMessage{}
 
 	for _, f := range t.Config.Fields {
 		if f.Name == field.InternalObjectIdField {
@@ -649,13 +659,7 @@ func (t *Table) ObjectToInterfaceMap(o object.Object) (map[string]interface{}, e
 			continue
 		}
 
-		i, err := idbutil.DBTypeToInterface(v, f)
-
-		if err != nil {
-			return nil, err
-		}
-
-		m[f.Name] = i
+		m[f.Name] = v.ToJsonRaw()
 	}
 
 	return m, nil

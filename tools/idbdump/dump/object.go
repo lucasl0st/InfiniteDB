@@ -4,4 +4,6 @@
 
 package dump
 
-type Object map[string]interface{}
+import "encoding/json"
+
+type Object map[string]json.RawMessage
