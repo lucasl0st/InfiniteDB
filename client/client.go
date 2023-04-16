@@ -28,17 +28,17 @@ type RequestResult struct {
 }
 
 type Client struct {
-	hostname       string
-	port           uint
-	tls            bool
-	skipTLSVerify  bool
-	authKey        *string
-	timeout        time.Duration
-	readLimit      int64
-	panicOnTimeout bool
-	connected      bool
-	ws             *websocket.Conn
-	ctx            context.Context
+	hostname               string
+	port                   uint
+	tls                    bool
+	skipTLSVerify          bool
+	authKey                *string
+	timeout                time.Duration
+	readLimit              int64
+	panicOnConnectionError bool
+	connected              bool
+	ws                     *websocket.Conn
+	ctx                    context.Context
 
 	channels sync.Map
 }
@@ -60,22 +60,22 @@ func New(options Options) *Client {
 		options.ReadLimit = ptr(int64(1000 * 1000 * 1000))
 	}
 
-	if options.PanicOnTimeout == nil {
-		options.PanicOnTimeout = ptr(true)
+	if options.PanicOnConnectionError == nil {
+		options.PanicOnConnectionError = ptr(true)
 	}
 
 	return &Client{
-		hostname:       options.Hostname,
-		port:           options.Port,
-		tls:            *options.TLS,
-		skipTLSVerify:  *options.SkipTLSVerify,
-		authKey:        options.AuthKey,
-		timeout:        *options.Timeout,
-		readLimit:      *options.ReadLimit,
-		panicOnTimeout: *options.PanicOnTimeout,
-		connected:      false,
-		ctx:            context.Background(),
-		channels:       sync.Map{},
+		hostname:               options.Hostname,
+		port:                   options.Port,
+		tls:                    *options.TLS,
+		skipTLSVerify:          *options.SkipTLSVerify,
+		authKey:                options.AuthKey,
+		timeout:                *options.Timeout,
+		readLimit:              *options.ReadLimit,
+		panicOnConnectionError: *options.PanicOnConnectionError,
+		connected:              false,
+		ctx:                    context.Background(),
+		channels:               sync.Map{},
 	}
 }
 
@@ -149,6 +149,10 @@ func (c *Client) read() {
 		_, data, err := c.ws.Read(c.ctx)
 
 		if err != nil {
+			if c.panicOnConnectionError {
+				panic(err.Error())
+			}
+
 			return
 		}
 
@@ -202,6 +206,10 @@ func (c *Client) sendRequest(request map[string]interface{}) (map[string]interfa
 	err = c.ws.Write(c.ctx, websocket.MessageText, data)
 
 	if err != nil {
+		if c.panicOnConnectionError {
+			panic(err.Error())
+		}
+
 		return nil, err
 	}
 
@@ -224,7 +232,7 @@ func (c *Client) getResponse(requestId int64) (map[string]interface{}, error) {
 	case <-time.After(c.timeout):
 		err := e.TimeoutReceivingDatabaseResult(requestId)
 
-		if c.panicOnTimeout {
+		if c.panicOnConnectionError {
 			panic(err.Error())
 		}
 
