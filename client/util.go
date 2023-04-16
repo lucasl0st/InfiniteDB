@@ -4,7 +4,9 @@
 
 package client
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 func mapToStruct[Type any](m map[string]interface{}, r *Type) error {
 	b, err := json.Marshal(m)

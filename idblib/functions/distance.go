@@ -5,10 +5,11 @@
 package functions
 
 import (
-	e "github.com/lucasl0st/InfiniteDB/errors"
+	"encoding/json"
 	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/object"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
+	"github.com/lucasl0st/InfiniteDB/idblib/util"
 	"math"
 )
 
@@ -20,8 +21,8 @@ type DistanceFunction struct {
 	latitudeFrom  string
 	longitudeFrom string
 
-	latitudeToValue  float64
-	longitudeToValue float64
+	latitudeToValue  dbtype.Number
+	longitudeToValue dbtype.Number
 
 	as string
 }
@@ -30,7 +31,7 @@ func (d *DistanceFunction) Run(
 	table *table.Table,
 	objects object.Objects,
 	additionalFields table.AdditionalFields,
-	parameters map[string]interface{},
+	parameters map[string]json.RawMessage,
 ) (object.Objects, table.AdditionalFields, error) {
 	err := d.parseParameters(parameters)
 
@@ -58,60 +59,80 @@ func (d *DistanceFunction) Run(
 			additionalFields[o] = make(map[string]dbtype.DBType)
 		}
 
-		additionalFields[o][d.as] = dbtype.NumberFromFloat64(d.distance(fromLatitudeValue.ToFloat64(), fromLongitudeValue.ToFloat64(), d.latitudeToValue, d.longitudeToValue))
+		distance, err := d.distance(fromLatitudeValue, fromLongitudeValue, d.latitudeToValue, d.latitudeToValue)
+
+		if err != nil {
+			return nil, nil, err
+		}
+
+		additionalFields[o][d.as] = distance
 	}
 
 	return objects, additionalFields, nil
 }
 
-func (d *DistanceFunction) parseParameters(parameters map[string]interface{}) error {
-	latFrom, ok := parameters["latitudeFrom"].(string)
-	if !ok {
-		return e.IsNotAString("latitudeFrom in distance function")
+func (d *DistanceFunction) parseParameters(parameters map[string]json.RawMessage) error {
+	latFrom, err := util.JsonRawToString(parameters["latitudeFrom"])
+
+	if err != nil {
+		return err
 	}
 
-	lonFrom, ok := parameters["longitudeFrom"].(string)
-	if !ok {
-		return e.IsNotAString("longitudeFrom in distance function")
+	lonFrom, err := util.JsonRawToString(parameters["longitudeFrom"])
+
+	if err != nil {
+		return err
 	}
 
-	latToValue, ok := parameters["latitudeToValue"].(float64)
-	if !ok {
-		return e.IsNotANumber("latitudeToValue in distance function")
+	latToValue, err := util.JsonRawToStringNumber(parameters["latitudeToValue"])
+
+	if err != nil {
+		return err
 	}
 
-	lonToValue, ok := parameters["longitudeToValue"].(float64)
-	if !ok {
-		return e.IsNotANumber("longitudeToValue in distance function")
+	lonToValue, err := util.JsonRawToStringNumber(parameters["latitudeToValue"])
+
+	if err != nil {
+		return err
 	}
 
-	as, ok := parameters["as"].(string)
+	as := fieldNameDistance
 
-	if !ok {
-		as = fieldNameDistance
+	asP, err := util.JsonRawToString(parameters["as"])
+
+	if asP != nil && len(*asP) > 0 && err == nil {
+		as = *asP
 	}
 
-	d.latitudeFrom = latFrom
-	d.longitudeFrom = lonFrom
-	d.latitudeToValue = latToValue
-	d.longitudeToValue = lonToValue
+	latToValueNumber, err := dbtype.NumberFromString(*latToValue)
+
+	if err != nil {
+		return err
+	}
+
+	lonToValueNumber, err := dbtype.NumberFromString(*lonToValue)
+
+	d.latitudeFrom = *latFrom
+	d.longitudeFrom = *lonFrom
+	d.latitudeToValue = latToValueNumber
+	d.longitudeToValue = lonToValueNumber
 	d.as = as
 
 	return nil
 }
 
-func (d *DistanceFunction) distance(fromLatitude float64, fromLongitude float64, toLatitude float64, toLongitude float64) float64 {
-	degreesLat := d.degrees2radians(toLatitude - fromLatitude)
-	degreesLong := d.degrees2radians(toLongitude - fromLongitude)
+func (d *DistanceFunction) distance(fromLatitude dbtype.Number, fromLongitude dbtype.Number, toLatitude dbtype.Number, toLongitude dbtype.Number) (dbtype.Number, error) {
+	degreesLat := d.degrees2radians(toLatitude.ToFloat64() - fromLatitude.ToFloat64())
+	degreesLong := d.degrees2radians(toLongitude.ToFloat64() - fromLongitude.ToFloat64())
 
 	a := math.Sin(degreesLat/2)*math.Sin(degreesLat/2) +
-		math.Cos(d.degrees2radians(fromLatitude))*
-			math.Cos(d.degrees2radians(toLatitude))*math.Sin(degreesLong/2)*
+		math.Cos(d.degrees2radians(fromLatitude.ToFloat64()))*
+			math.Cos(d.degrees2radians(toLatitude.ToFloat64()))*math.Sin(degreesLong/2)*
 			math.Sin(degreesLong/2)
 	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
 	distance := radius * c
 
-	return distance
+	return dbtype.NumberFromFloat64(distance)
 }
 
 func (d *DistanceFunction) degrees2radians(degrees float64) float64 {

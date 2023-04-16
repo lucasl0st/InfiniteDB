@@ -5,10 +5,12 @@
 package server
 
 import (
+	"encoding/json"
 	"github.com/google/uuid"
 	"github.com/lucasl0st/InfiniteDB/idblib"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
+	"github.com/lucasl0st/InfiniteDB/idblib/util"
 	"github.com/lucasl0st/InfiniteDB/request"
 )
 
@@ -56,9 +58,9 @@ func SetupAuthenticationTable(idb *idblib.IDB) error {
 
 	mainKey := uuid.New().String()
 
-	mainKeyObject := make(map[string]interface{})
-	mainKeyObject[AuthenticationTableFieldKeyId] = AuthenticationKeyMain
-	mainKeyObject[AuthenticationTableFieldKeyValue] = mainKey
+	mainKeyObject := make(map[string]json.RawMessage)
+	mainKeyObject[AuthenticationTableFieldKeyId] = util.StringToJsonRaw(AuthenticationKeyMain)
+	mainKeyObject[AuthenticationTableFieldKeyValue] = util.StringToJsonRaw(mainKey)
 
 	_, err = idb.InsertToDatabaseTable(InternalDatabase, AuthenticationTable, mainKeyObject)
 
@@ -77,7 +79,7 @@ func authenticated(idb *idblib.IDB, key string) (bool, error) {
 			Where: &request.Where{
 				Field:    AuthenticationTableFieldKeyValue,
 				Operator: request.EQUALS,
-				Value:    &key,
+				Value:    util.StringToJsonRaw(key),
 			},
 		},
 	}
@@ -89,7 +91,13 @@ func authenticated(idb *idblib.IDB, key string) (bool, error) {
 	}
 
 	for _, result := range res.Results {
-		if result[AuthenticationTableFieldKeyValue] == key {
+		s, err := util.JsonRawToString(result[AuthenticationTableFieldKeyValue])
+
+		if err != nil {
+			return false, err
+		}
+
+		if *s == key {
 			return true, nil
 		}
 	}

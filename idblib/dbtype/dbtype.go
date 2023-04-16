@@ -5,6 +5,7 @@
 package dbtype
 
 import (
+	"encoding/json"
 	"regexp"
 )
 
@@ -16,5 +17,6 @@ type DBType interface {
 	Matches(r regexp.Regexp) bool
 	Between(s DBType, l DBType) bool
 	ToString() string
+	ToJsonRaw() json.RawMessage
 	IsNull() bool
 }

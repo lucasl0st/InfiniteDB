@@ -4,10 +4,12 @@
 
 package request
 
+import "encoding/json"
+
 type Where struct {
-	Field    string        `json:"field"`
-	Operator Operator      `json:"operator"`
-	Value    interface{}   `json:"value"`
-	All      []interface{} `json:"all"`
-	Any      []interface{} `json:"any"`
+	Field    string            `json:"field"`
+	Operator Operator          `json:"operator"`
+	Value    json.RawMessage   `json:"value"`
+	All      []json.RawMessage `json:"all"`
+	Any      []json.RawMessage `json:"any"`
 }

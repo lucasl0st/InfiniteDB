@@ -4,7 +4,9 @@
 
 package request
 
+import "encoding/json"
+
 type Function struct {
-	Function   string                  `json:"function"`
-	Parameters *map[string]interface{} `json:"parameters"`
+	Function   string                      `json:"function"`
+	Parameters *map[string]json.RawMessage `json:"parameters"`
 }

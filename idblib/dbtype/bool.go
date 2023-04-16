@@ -5,6 +5,7 @@
 package dbtype
 
 import (
+	"encoding/json"
 	"regexp"
 )
 
@@ -71,6 +72,10 @@ func (a Bool) ToString() string {
 	} else {
 		return "false"
 	}
+}
+
+func (a Bool) ToJsonRaw() json.RawMessage {
+	return json.RawMessage(a.ToString())
 }
 
 func (a Bool) IsNull() bool {

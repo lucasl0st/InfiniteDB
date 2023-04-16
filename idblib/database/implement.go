@@ -5,28 +5,24 @@
 package database
 
 import (
+	"encoding/json"
 	e "github.com/lucasl0st/InfiniteDB/errors"
 	"github.com/lucasl0st/InfiniteDB/idblib/object"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
-	"github.com/lucasl0st/InfiniteDB/idblib/util"
 	"github.com/lucasl0st/InfiniteDB/request"
 )
 
-func (d *Database) implement(t *table.Table, implement request.Implement, objects []object.Object) (map[int64]interface{}, *string, error) {
+func (d *Database) implement(t *table.Table, implement request.Implement, objects []object.Object) (map[int64]json.RawMessage, *string, error) {
 	fromTable := d.tables[implement.From.Table]
 
 	if fromTable == nil {
 		return nil, nil, e.TableDoesNotExist()
 	}
 
-	implementObjectsMap := map[int64]interface{}{}
+	implementObjectsMap := map[int64]json.RawMessage{}
 
 	for _, o := range objects {
-		i, err := util.DBTypeToInterface(o.M[implement.Field], t.Config.Fields[implement.Field])
-
-		if err != nil {
-			return nil, nil, err
-		}
+		i := o.M[implement.Field].ToJsonRaw()
 
 		queryObjects, _, err := fromTable.Query(table.Query{
 			Where: &request.Where{
@@ -47,9 +43,9 @@ func (d *Database) implement(t *table.Table, implement request.Implement, object
 				forceArray = *implement.ForceArray
 			}
 
-			var i interface{}
+			var i json.RawMessage
 
-			var a []map[string]interface{}
+			var a []map[string]json.RawMessage
 
 			for _, id := range queryObjects {
 				o := fromTable.Storage.GetObject(id)
@@ -58,7 +54,7 @@ func (d *Database) implement(t *table.Table, implement request.Implement, object
 					continue
 				}
 
-				io, err := fromTable.ObjectToInterfaceMap(*o)
+				io, err := fromTable.ObjectToJsonRawMap(*o)
 
 				if err != nil {
 					return nil, nil, err
@@ -67,11 +63,19 @@ func (d *Database) implement(t *table.Table, implement request.Implement, object
 				a = append(a, io)
 			}
 
+			var b []byte
+
 			if len(a) > 1 || forceArray {
-				i = a
+				b, err = json.Marshal(a)
 			} else {
-				i = a[0]
+				b, err = json.Marshal(a[0])
 			}
+
+			if err != nil {
+				return nil, nil, err
+			}
+
+			i = b
 
 			implementObjectsMap[o.Id] = i
 		}

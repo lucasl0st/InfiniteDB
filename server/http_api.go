@@ -318,7 +318,7 @@ func (h *HttpApi) getFromDatabaseTableHandler(c *gin.Context) {
 }
 
 func (h *HttpApi) insertToDatabaseTableHandler(c *gin.Context) {
-	body := h.getBody(c)
+	body := h.getJsonRawBody(c)
 
 	if body != nil {
 		name := c.Param("name")
@@ -389,7 +389,7 @@ func (h *HttpApi) removeFromDatabaseTableHandler(c *gin.Context) {
 }
 
 func (h *HttpApi) updateInDatabaseTableHandler(c *gin.Context) {
-	body := h.getBody(c)
+	body := h.getJsonRawBody(c)
 
 	if body != nil {
 		name := c.Param("name")
@@ -429,6 +429,26 @@ func (h *HttpApi) getBody(c *gin.Context) *map[string]interface{} {
 	}
 
 	var m map[string]interface{}
+	err = json.Unmarshal(bytes, &m)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to parse JSON", "error": err.Error()})
+		return nil
+	}
+
+	return &m
+}
+
+func (h *HttpApi) getJsonRawBody(c *gin.Context) *map[string]json.RawMessage {
+	bytes, err := io.ReadAll(c.Request.Body)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "Failed to read body"})
+		return nil
+	}
+
+	var m map[string]json.RawMessage
+
 	err = json.Unmarshal(bytes, &m)
 
 	if err != nil {

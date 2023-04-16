@@ -6,11 +6,9 @@ package database
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
 	e "github.com/lucasl0st/InfiniteDB/errors"
-	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
 	"github.com/lucasl0st/InfiniteDB/idblib/object"
@@ -246,7 +244,7 @@ func (d *Database) GetTable(tableName string) ([]request.Field, *request.TableOp
 	return fields, &t.Config.Options, nil
 }
 
-func (d *Database) Get(tableName string, request table.Request) ([]map[string]interface{}, error) {
+func (d *Database) Get(tableName string, request table.Request) ([]map[string]json.RawMessage, error) {
 	if request.Query != nil {
 		t := d.tables[tableName]
 
@@ -264,11 +262,11 @@ func (d *Database) Get(tableName string, request table.Request) ([]map[string]in
 
 		results := t.Storage.GetObjects(objects)
 
-		implementObjectsMap := map[int64]map[string]interface{}{}
+		implementObjectsMap := map[int64]map[string]json.RawMessage{}
 
 		if request.Implement != nil {
 			for _, id := range objects {
-				implementObjectsMap[id] = map[string]interface{}{}
+				implementObjectsMap[id] = map[string]json.RawMessage{}
 			}
 
 			for _, implement := range request.Implement {
@@ -284,7 +282,7 @@ func (d *Database) Get(tableName string, request table.Request) ([]map[string]in
 			}
 		}
 
-		interfaceObjects, err := d.objectsToMapStringInterfaceArray(results, t, implementObjectsMap, additionalFields)
+		interfaceObjects, err := d.objectsToMapStringJsonRawArray(results, t, implementObjectsMap, additionalFields)
 
 		if err != nil {
 			return nil, err
@@ -308,7 +306,7 @@ func (d *Database) Remove(tableName string, request table.Request) (int64, error
 	var count int64 = 0
 
 	for _, o := range objects {
-		om, err := t.InterfaceMapToObject(o)
+		om, err := t.JsonRawMapToObject(o)
 
 		if err != nil {
 			return 0, err
@@ -326,7 +324,7 @@ func (d *Database) Remove(tableName string, request table.Request) (int64, error
 	return count, nil
 }
 
-func (d *Database) Insert(tableName string, o map[string]interface{}) error {
+func (d *Database) Insert(tableName string, o map[string]json.RawMessage) error {
 	t := d.tables[tableName]
 
 	if t == nil {
@@ -336,7 +334,7 @@ func (d *Database) Insert(tableName string, o map[string]interface{}) error {
 	return t.Insert(o)
 }
 
-func (d *Database) Update(tableName string, o map[string]interface{}) error {
+func (d *Database) Update(tableName string, o map[string]json.RawMessage) error {
 	t := d.tables[tableName]
 
 	if t == nil {
@@ -346,16 +344,16 @@ func (d *Database) Update(tableName string, o map[string]interface{}) error {
 	return t.Update(o)
 }
 
-func (d *Database) objectsToMapStringInterfaceArray(
+func (d *Database) objectsToMapStringJsonRawArray(
 	objects []object.Object,
 	t *table.Table,
-	implementObjectsMap map[int64]map[string]interface{},
+	implementObjectsMap map[int64]map[string]json.RawMessage,
 	additionalFields table.AdditionalFields,
-) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
+) ([]map[string]json.RawMessage, error) {
+	var results []map[string]json.RawMessage
 
 	for _, o := range objects {
-		interfaceMap, err := t.ObjectToInterfaceMap(o)
+		interfaceMap, err := t.ObjectToJsonRawMap(o)
 
 		if err != nil {
 			return nil, err
@@ -373,28 +371,7 @@ func (d *Database) objectsToMapStringInterfaceArray(
 
 		if ok {
 			for key, value := range additional {
-				t, ok := value.(dbtype.Text)
-
-				if ok {
-					interfaceMap[key] = t.ToString()
-					continue
-				}
-
-				n, ok := value.(dbtype.Number)
-
-				if ok {
-					interfaceMap[key] = n.ToFloat64()
-					continue
-				}
-
-				b, ok := value.(dbtype.Bool)
-
-				if ok {
-					interfaceMap[key] = b.ToBool()
-					continue
-				}
-
-				panic(errors.New("dbtype not implemented"))
+				interfaceMap[key] = value.ToJsonRaw()
 			}
 		}
 
