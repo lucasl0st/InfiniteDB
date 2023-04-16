@@ -7,11 +7,12 @@ package client
 import "time"
 
 type Options struct {
-	Hostname      string
-	Port          uint
-	TLS           *bool
-	SkipTLSVerify *bool
-	AuthKey       *string
-	Timeout       *time.Duration
-	ReadLimit     *int64
+	Hostname       string
+	Port           uint
+	TLS            *bool
+	SkipTLSVerify  *bool
+	AuthKey        *string
+	Timeout        *time.Duration
+	ReadLimit      *int64
+	PanicOnTimeout *bool
 }

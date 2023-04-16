@@ -28,16 +28,17 @@ type RequestResult struct {
 }
 
 type Client struct {
-	hostname      string
-	port          uint
-	tls           bool
-	skipTLSVerify bool
-	authKey       *string
-	timeout       time.Duration
-	readLimit     int64
-	connected     bool
-	ws            *websocket.Conn
-	ctx           context.Context
+	hostname       string
+	port           uint
+	tls            bool
+	skipTLSVerify  bool
+	authKey        *string
+	timeout        time.Duration
+	readLimit      int64
+	panicOnTimeout bool
+	connected      bool
+	ws             *websocket.Conn
+	ctx            context.Context
 
 	channels sync.Map
 }
@@ -59,17 +60,22 @@ func New(options Options) *Client {
 		options.ReadLimit = ptr(int64(1000 * 1000 * 1000))
 	}
 
+	if options.PanicOnTimeout == nil {
+		options.PanicOnTimeout = ptr(true)
+	}
+
 	return &Client{
-		hostname:      options.Hostname,
-		port:          options.Port,
-		tls:           *options.TLS,
-		skipTLSVerify: *options.SkipTLSVerify,
-		authKey:       options.AuthKey,
-		timeout:       *options.Timeout,
-		readLimit:     *options.ReadLimit,
-		connected:     false,
-		ctx:           context.Background(),
-		channels:      sync.Map{},
+		hostname:       options.Hostname,
+		port:           options.Port,
+		tls:            *options.TLS,
+		skipTLSVerify:  *options.SkipTLSVerify,
+		authKey:        options.AuthKey,
+		timeout:        *options.Timeout,
+		readLimit:      *options.ReadLimit,
+		panicOnTimeout: *options.PanicOnTimeout,
+		connected:      false,
+		ctx:            context.Background(),
+		channels:       sync.Map{},
 	}
 }
 
@@ -216,7 +222,13 @@ func (c *Client) getResponse(requestId int64) (map[string]interface{}, error) {
 
 		return res.M, nil
 	case <-time.After(c.timeout):
-		return nil, e.TimeoutReceivingDatabaseResult(requestId)
+		err := e.TimeoutReceivingDatabaseResult(requestId)
+
+		if c.panicOnTimeout {
+			panic(err.Error())
+		}
+
+		return nil, err
 	}
 }
 
