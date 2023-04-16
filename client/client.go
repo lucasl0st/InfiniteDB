@@ -56,7 +56,7 @@ func New(options Options) *Client {
 	}
 
 	if options.ReadLimit == nil {
-		options.ReadLimit = ptr(int64(1024 * 1000 * 1000))
+		options.ReadLimit = ptr(int64(1000 * 1000 * 1000))
 	}
 
 	return &Client{
