@@ -10,12 +10,20 @@ import (
 	"errors"
 	"fmt"
 	"github.com/magefile/mage/sh"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
 
+var Default = Build
+
 const binaryName = "infinitedb-server"
 const buildDir = "build"
+
+var tools = []string{
+	"idbdump",
+}
 
 type dockerImage struct {
 	tag       string
@@ -56,8 +64,9 @@ type target struct {
 }
 
 type result struct {
-	t    target
-	path string
+	t          target
+	path       string
+	binaryName string
 }
 
 var supportedTargets = []target{
@@ -215,7 +224,7 @@ func Build() error {
 
 func Build_all() error {
 	for _, t := range supportedTargets {
-		_, err := build(t)
+		_, err := buildServerAndTools(t)
 
 		if err != nil {
 			return err
@@ -245,6 +254,10 @@ func Build_windows() error {
 	return err
 }
 
+func Clean() error {
+	return os.RemoveAll(buildDir)
+}
+
 func version() (string, error) {
 	return sh.Output("git", "describe", "--tags", "--always")
 }
@@ -257,19 +270,23 @@ func buildForOs(o operating_system) ([]result, error) {
 			continue
 		}
 
-		result, err := build(t)
+		r, err := buildServerAndTools(t)
 
 		if err != nil {
 			return nil, err
 		}
 
-		results = append(results, *result)
+		for _, rr := range r {
+			if rr.binaryName == binaryName {
+				results = append(results, rr)
+			}
+		}
 	}
 
 	return results, nil
 }
 
-func buildForRunningArch() (*result, error) {
+func buildForRunningArch() ([]result, error) {
 	var t *target = nil
 
 	for _, supportedTarget := range supportedTargets {
@@ -283,17 +300,59 @@ func buildForRunningArch() (*result, error) {
 		return nil, errors.New("this architecture or operating system is not supported")
 	}
 
-	return build(*t)
+	return buildServerAndTools(*t)
 }
 
-func build(t target) (*result, error) {
+func buildServerAndTools(t target) ([]result, error) {
+	var results []result
+
+	r, err := buildGo(t, "./", binaryName)
+
+	if err != nil {
+		return nil, err
+	}
+
+	results = append(results, *r)
+
+	for _, tool := range tools {
+		r, err := buildGo(t, fmt.Sprintf("./tools/%s", tool), tool)
+
+		if err != nil {
+			return nil, err
+		}
+
+		results = append(results, *r)
+	}
+
+	return results, nil
+}
+
+func buildGo(t target, src string, binaryName string) (*result, error) {
 	v, err := version()
 
 	if err != nil {
 		return nil, err
 	}
 
-	out := fmt.Sprintf("%s/%s_%s_%s_%s", buildDir, binaryName, v, t.Os, t.Arch)
+	out, err := filepath.Abs(fmt.Sprintf("%s/%s_%s_%s_%s", buildDir, binaryName, v, t.Os, t.Arch))
+
+	if err != nil {
+		return nil, err
+	}
+
+	root, err := os.Getwd()
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = os.Chdir(src)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer os.Chdir(root)
 
 	env := map[string]string{
 		"CGO_ENABLED": fmt.Sprint("0"),
@@ -310,8 +369,9 @@ func build(t target) (*result, error) {
 	fmt.Printf("built %s \n", out)
 
 	return &result{
-		t:    t,
-		path: out,
+		t:          t,
+		path:       out,
+		binaryName: binaryName,
 	}, err
 }
 

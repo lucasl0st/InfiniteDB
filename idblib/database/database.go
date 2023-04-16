@@ -6,9 +6,11 @@ package database
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
 	e "github.com/lucasl0st/InfiniteDB/errors"
+	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
 	"github.com/lucasl0st/InfiniteDB/idblib/object"
@@ -216,11 +218,32 @@ func (d *Database) CreateTable(name string, fields map[string]field.Field, optio
 func (d *Database) GetTableNames() []string {
 	var tableNames []string
 
-	for tableName := range d.tables {
-		tableNames = append(tableNames, tableName)
+	for _, t := range d.tables {
+		tableNames = append(tableNames, t.Name)
 	}
 
 	return tableNames
+}
+
+func (d *Database) GetTable(tableName string) ([]request.Field, *request.TableOptions, error) {
+	t := d.tables[tableName]
+
+	if t == nil {
+		return nil, nil, e.TableDoesNotExist()
+	}
+
+	var fields []request.Field
+
+	for _, f := range t.Config.Fields {
+		fields = append(fields, request.Field{
+			Type:    fmt.Sprint(f.Type),
+			Indexed: util.Ptr(f.Indexed),
+			Unique:  util.Ptr(f.Unique),
+			Null:    util.Ptr(f.Null),
+		})
+	}
+
+	return fields, &t.Config.Options, nil
 }
 
 func (d *Database) Get(tableName string, request table.Request) ([]map[string]interface{}, error) {
@@ -261,7 +284,7 @@ func (d *Database) Get(tableName string, request table.Request) ([]map[string]in
 			}
 		}
 
-		interfaceObjects, err := d.objectsToMapStringInterfaceArray(results, t, implementObjectsMap)
+		interfaceObjects, err := d.objectsToMapStringInterfaceArray(results, t, implementObjectsMap, additionalFields)
 
 		if err != nil {
 			return nil, err
@@ -323,7 +346,12 @@ func (d *Database) Update(tableName string, o map[string]interface{}) error {
 	return t.Update(o)
 }
 
-func (d *Database) objectsToMapStringInterfaceArray(objects []object.Object, t *table.Table, implementObjectsMap map[int64]map[string]interface{}) ([]map[string]interface{}, error) {
+func (d *Database) objectsToMapStringInterfaceArray(
+	objects []object.Object,
+	t *table.Table,
+	implementObjectsMap map[int64]map[string]interface{},
+	additionalFields table.AdditionalFields,
+) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
 
 	for _, o := range objects {
@@ -338,6 +366,35 @@ func (d *Database) objectsToMapStringInterfaceArray(objects []object.Object, t *
 		if ok {
 			for key, value := range implementObjects {
 				interfaceMap[key] = value
+			}
+		}
+
+		additional, ok := additionalFields[o.Id]
+
+		if ok {
+			for key, value := range additional {
+				t, ok := value.(dbtype.Text)
+
+				if ok {
+					interfaceMap[key] = t.ToString()
+					continue
+				}
+
+				n, ok := value.(dbtype.Number)
+
+				if ok {
+					interfaceMap[key] = n.ToFloat64()
+					continue
+				}
+
+				b, ok := value.(dbtype.Bool)
+
+				if ok {
+					interfaceMap[key] = b.ToBool()
+					continue
+				}
+
+				panic(errors.New("dbtype not implemented"))
 			}
 		}
 

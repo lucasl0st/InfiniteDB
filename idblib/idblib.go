@@ -250,9 +250,25 @@ func (i *IDB) GetDatabaseTables(name string) (response.GetDatabaseTablesResponse
 
 	tableNames := d.GetTableNames()
 
+	var tables []response.GetDatabaseTablesResponseTable
+
+	for _, tableName := range tableNames {
+		fields, options, err := d.GetTable(tableName)
+
+		if err != nil {
+			return response.GetDatabaseTablesResponse{}, nil
+		}
+
+		tables = append(tables, response.GetDatabaseTablesResponseTable{
+			Name:    tableName,
+			Fields:  fields,
+			Options: *options,
+		})
+	}
+
 	return response.GetDatabaseTablesResponse{
 		Name:   name,
-		Tables: tableNames,
+		Tables: tables,
 	}, nil
 }
 

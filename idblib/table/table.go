@@ -55,6 +55,14 @@ func NewTable(
 
 	table.Storage = s
 
+	table.Config.Fields[field.InternalObjectIdField] = field.Field{
+		Name:    field.InternalObjectIdField,
+		Indexed: true,
+		Unique:  true,
+		Null:    false,
+		Type:    field.NUMBER,
+	}
+
 	return &table, err
 }
 
@@ -103,7 +111,7 @@ func (t *Table) Where(w request.Where, andObjects object.Objects) (object.Object
 			return nil, e.ValueForOperatorMustBeString(request.BETWEEN)
 		}
 
-		values := strings.Split(s, "-")
+		values := strings.Split(s, "_")
 
 		if len(values) <= 1 {
 			return nil, e.NotEnoughValuesForOperator(w.Operator)
@@ -503,7 +511,7 @@ func (t *Table) isUnique(o *object.Object) error {
 
 func (t *Table) allFieldsHaveValues(o *object.Object) error {
 	for fieldName, f := range t.Config.Fields {
-		if o.M[fieldName] == nil && !f.Null {
+		if o.M[fieldName] == nil && !f.Null && f.Name != field.InternalObjectIdField {
 			return e.ObjectDoesNotHaveValueForField(fieldName)
 		}
 	}
@@ -605,6 +613,10 @@ func (t *Table) InterfaceMapToObject(m map[string]interface{}) (*object.Object, 
 	}
 
 	for _, f := range t.Config.Fields {
+		if f.Name == field.InternalObjectIdField {
+			continue
+		}
+
 		i, ok := m[f.Name]
 
 		if !ok {
@@ -627,6 +639,10 @@ func (t *Table) ObjectToInterfaceMap(o object.Object) (map[string]interface{}, e
 	m := map[string]interface{}{}
 
 	for _, f := range t.Config.Fields {
+		if f.Name == field.InternalObjectIdField {
+			continue
+		}
+
 		v, ok := o.M[f.Name]
 
 		if !ok {
