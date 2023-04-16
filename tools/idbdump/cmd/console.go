@@ -11,6 +11,7 @@ import (
 	"github.com/lucasl0st/InfiniteDB/util"
 	"github.com/spf13/cobra"
 	"os"
+	"time"
 )
 
 // consoleCmd represents the console command
@@ -39,6 +40,8 @@ func dumpToConsole() error {
 		TLS:           util.Ptr(databaseTls),
 		SkipTLSVerify: util.Ptr(databaseTlsVerifyDisable),
 		AuthKey:       util.Ptr(databaseKey),
+		Timeout:       util.Ptr(time.Second * time.Duration(databaseTimeout)),
+		ReadLimit:     util.Ptr(databaseReadLimit),
 	})
 
 	r := dump.ConsoleReceiver{}

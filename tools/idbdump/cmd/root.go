@@ -23,6 +23,8 @@ var (
 	databaseTls              bool
 	databaseTlsVerifyDisable bool
 	databaseKey              string
+	databaseTimeout          int
+	databaseReadLimit        int64
 )
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -43,4 +45,6 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&databaseTls, "database-tls", "s", false, "connect to database with SSL")
 	rootCmd.PersistentFlags().BoolVar(&databaseTlsVerifyDisable, "database-disable-tls-verify", false, "disable TLS certificate verification for database")
 	rootCmd.PersistentFlags().StringVarP(&databaseKey, "database-key", "k", "", "key for database if authentication is enabled")
+	rootCmd.PersistentFlags().IntVar(&databaseTimeout, "database-timeout", 10, "timeout for receiving database results in seconds")
+	rootCmd.PersistentFlags().Int64Var(&databaseReadLimit, "database-read-limit", int64(1000*1000*1000), "read limit for database results in bytes")
 }

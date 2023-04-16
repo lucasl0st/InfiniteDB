@@ -12,6 +12,7 @@ import (
 	"github.com/lucasl0st/InfiniteDB/util"
 	"github.com/spf13/cobra"
 	"os"
+	"time"
 )
 
 // fileCmd represents the file command
@@ -51,6 +52,8 @@ func dumpToFile() error {
 		TLS:           util.Ptr(databaseTls),
 		SkipTLSVerify: util.Ptr(databaseTlsVerifyDisable),
 		AuthKey:       util.Ptr(databaseKey),
+		Timeout:       util.Ptr(time.Second * time.Duration(databaseTimeout)),
+		ReadLimit:     util.Ptr(databaseReadLimit),
 	})
 
 	if _, err := os.Stat(outputFile); err == nil {
