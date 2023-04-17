@@ -47,5 +47,5 @@ jobs:
       - name: Upload builds
         uses: actions/upload-artifact@v3
         with:
-          name: infinitedb-server
+          name: binaries
           path: build/*
