@@ -8,15 +8,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	e "github.com/lucasl0st/InfiniteDB/errors"
 	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
 	"github.com/lucasl0st/InfiniteDB/idblib/object"
 	"github.com/lucasl0st/InfiniteDB/idblib/storage"
 	idbutil "github.com/lucasl0st/InfiniteDB/idblib/util"
-	"github.com/lucasl0st/InfiniteDB/request"
-	"github.com/lucasl0st/InfiniteDB/util"
+	e "github.com/lucasl0st/InfiniteDB/models/errors"
+	"github.com/lucasl0st/InfiniteDB/models/request"
 	"os"
 	"regexp"
 	gsort "sort"
@@ -37,7 +36,7 @@ func NewTable(
 	name string,
 	path string,
 	config field.TableConfig,
-	logger util.Logger,
+	logger idbutil.Logger,
 	metrics *metrics.Metrics,
 	cacheSize uint,
 ) (*Table, error) {

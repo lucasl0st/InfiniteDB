@@ -9,14 +9,14 @@ import (
 	"errors"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
-	e "github.com/lucasl0st/InfiniteDB/errors"
 	"github.com/lucasl0st/InfiniteDB/idblib/database"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
-	"github.com/lucasl0st/InfiniteDB/request"
-	"github.com/lucasl0st/InfiniteDB/response"
-	"github.com/lucasl0st/InfiniteDB/util"
+	"github.com/lucasl0st/InfiniteDB/idblib/util"
+	e "github.com/lucasl0st/InfiniteDB/models/errors"
+	"github.com/lucasl0st/InfiniteDB/models/request"
+	"github.com/lucasl0st/InfiniteDB/models/response"
 	"os"
 	"strings"
 	"sync"
@@ -239,37 +239,29 @@ func (i *IDB) GetDatabase(name string) (response.GetDatabaseResponse, error) {
 		return response.GetDatabaseResponse{}, e.DatabaseDoesNotExist()
 	}
 
-	return response.GetDatabaseResponse{Name: d.Name}, nil
+	tableNames := d.GetTableNames()
+
+	return response.GetDatabaseResponse{Name: d.Name, Tables: tableNames}, nil
 }
 
-func (i *IDB) GetDatabaseTables(name string) (response.GetDatabaseTablesResponse, error) {
+func (i *IDB) GetDatabaseTable(name string, tableName string) (response.GetDatabaseTableResponse, error) {
 	d := i.databases[name]
 
 	if d == nil {
-		return response.GetDatabaseTablesResponse{}, e.DatabaseDoesNotExist()
+		return response.GetDatabaseTableResponse{}, e.DatabaseDoesNotExist()
 	}
 
-	tableNames := d.GetTableNames()
+	fields, options, err := d.GetTable(tableName)
 
-	var tables []response.GetDatabaseTablesResponseTable
-
-	for _, tableName := range tableNames {
-		fields, options, err := d.GetTable(tableName)
-
-		if err != nil {
-			return response.GetDatabaseTablesResponse{}, nil
-		}
-
-		tables = append(tables, response.GetDatabaseTablesResponseTable{
-			Name:    tableName,
-			Fields:  fields,
-			Options: *options,
-		})
+	if err != nil {
+		return response.GetDatabaseTableResponse{}, nil
 	}
 
-	return response.GetDatabaseTablesResponse{
-		Name:   name,
-		Tables: tables,
+	return response.GetDatabaseTableResponse{
+		Name:      name,
+		TableName: tableName,
+		Fields:    fields,
+		Options:   *options,
 	}, nil
 }
 

@@ -8,12 +8,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
-	e "github.com/lucasl0st/InfiniteDB/errors"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
 	"github.com/lucasl0st/InfiniteDB/idblib/object"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
-	"github.com/lucasl0st/InfiniteDB/request"
+	idbutil "github.com/lucasl0st/InfiniteDB/idblib/util"
+	e "github.com/lucasl0st/InfiniteDB/models/errors"
+	"github.com/lucasl0st/InfiniteDB/models/request"
 	"github.com/lucasl0st/InfiniteDB/util"
 	"os"
 	"strings"
@@ -25,14 +26,14 @@ type Database struct {
 	path              string
 	tablesPath        string
 	tables            map[string]*table.Table
-	l                 util.Logger
+	l                 idbutil.Logger
 	m                 *metrics.Metrics
 	cacheSize         uint
 	watchForNewTables bool
 	watcher           *fsnotify.Watcher
 }
 
-func NewDatabase(name string, path string, logger util.Logger, metrics *metrics.Metrics, cacheSize uint) (*Database, int, error) {
+func NewDatabase(name string, path string, logger idbutil.Logger, metrics *metrics.Metrics, cacheSize uint) (*Database, int, error) {
 	watcher, err := fsnotify.NewWatcher()
 
 	if err != nil {
@@ -223,22 +224,22 @@ func (d *Database) GetTableNames() []string {
 	return tableNames
 }
 
-func (d *Database) GetTable(tableName string) ([]request.Field, *request.TableOptions, error) {
+func (d *Database) GetTable(tableName string) (map[string]request.Field, *request.TableOptions, error) {
 	t := d.tables[tableName]
 
 	if t == nil {
 		return nil, nil, e.TableDoesNotExist()
 	}
 
-	var fields []request.Field
+	fields := map[string]request.Field{}
 
-	for _, f := range t.Config.Fields {
-		fields = append(fields, request.Field{
+	for name, f := range t.Config.Fields {
+		fields[name] = request.Field{
 			Type:    fmt.Sprint(f.Type),
 			Indexed: util.Ptr(f.Indexed),
 			Unique:  util.Ptr(f.Unique),
 			Null:    util.Ptr(f.Null),
-		})
+		}
 	}
 
 	return fields, &t.Config.Options, nil
@@ -270,7 +271,7 @@ func (d *Database) Get(tableName string, request table.Request) ([]map[string]js
 			}
 
 			for _, implement := range request.Implement {
-				i, as, err := d.implement(t, implement, results)
+				i, as, err := d.implement(implement, results)
 
 				if err != nil {
 					return nil, err

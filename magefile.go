@@ -23,6 +23,7 @@ const buildDir = "build"
 
 var tools = []string{
 	"idbdump",
+	"idbcli",
 }
 
 type dockerImage struct {
@@ -306,7 +307,7 @@ func buildForRunningArch() ([]result, error) {
 func buildServerAndTools(t target) ([]result, error) {
 	var results []result
 
-	r, err := buildGo(t, "./", binaryName)
+	r, err := buildGo(t, "./server", binaryName)
 
 	if err != nil {
 		return nil, err

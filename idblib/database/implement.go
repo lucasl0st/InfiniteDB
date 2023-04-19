@@ -6,13 +6,13 @@ package database
 
 import (
 	"encoding/json"
-	e "github.com/lucasl0st/InfiniteDB/errors"
 	"github.com/lucasl0st/InfiniteDB/idblib/object"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
-	"github.com/lucasl0st/InfiniteDB/request"
+	e "github.com/lucasl0st/InfiniteDB/models/errors"
+	"github.com/lucasl0st/InfiniteDB/models/request"
 )
 
-func (d *Database) implement(t *table.Table, implement request.Implement, objects []object.Object) (map[int64]json.RawMessage, *string, error) {
+func (d *Database) implement(implement request.Implement, objects []object.Object) (map[int64]json.RawMessage, *string, error) {
 	fromTable := d.tables[implement.From.Table]
 
 	if fromTable == nil {

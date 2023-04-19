@@ -2,11 +2,11 @@
  * Copyright (c) 2023 Lucas Pape
  */
 
-package server
+package util
 
 import "encoding/json"
 
-func toMap(i interface{}) (map[string]json.RawMessage, error) {
+func ToMap(i interface{}) (map[string]json.RawMessage, error) {
 	b, err := json.Marshal(i)
 
 	if err != nil {
@@ -24,7 +24,7 @@ func toMap(i interface{}) (map[string]json.RawMessage, error) {
 	return m, nil
 }
 
-func toStruct(i interface{}, r any) error {
+func ToStruct(i interface{}, r any) error {
 	b, err := json.Marshal(i)
 
 	if err != nil {

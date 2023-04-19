@@ -12,7 +12,6 @@ import (
 	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
 	idblib "github.com/lucasl0st/InfiniteDB/idblib/object"
 	idbutil "github.com/lucasl0st/InfiniteDB/idblib/util"
-	"github.com/lucasl0st/InfiniteDB/util"
 	"sort"
 	"sync"
 	"time"
@@ -27,7 +26,7 @@ type Storage struct {
 	writeQueueLock sync.Mutex
 	addedObject    func(object idblib.Object)
 	deletedObject  func(object idblib.Object)
-	l              util.Logger
+	l              idbutil.Logger
 	write          bool
 	fields         map[string]field.Field
 }
@@ -36,7 +35,7 @@ func NewStorage(
 	path string,
 	addedObject func(object idblib.Object),
 	deletedObject func(object idblib.Object),
-	logger util.Logger,
+	logger idbutil.Logger,
 	metrics *metrics.Metrics,
 	cacheSize uint,
 	fields map[string]field.Field,

@@ -11,8 +11,8 @@ import (
 	"github.com/lucasl0st/InfiniteDB/client"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	idbutil "github.com/lucasl0st/InfiniteDB/idblib/util"
-	"github.com/lucasl0st/InfiniteDB/request"
-	"github.com/lucasl0st/InfiniteDB/response"
+	"github.com/lucasl0st/InfiniteDB/models/request"
+	toolsutil "github.com/lucasl0st/InfiniteDB/tools/util"
 	"github.com/lucasl0st/InfiniteDB/util"
 )
 
@@ -53,13 +53,13 @@ func (dump *Dump) Dump() error {
 }
 
 func (dump *Dump) database(d string) error {
-	err := dump.r.WriteStruct(Database{Name: d})
+	err := dump.r.WriteStruct(toolsutil.Database{Name: d})
 
 	if err != nil {
 		return err
 	}
 
-	r, err := dump.c.GetDatabaseTables(d)
+	r, err := dump.c.GetDatabase(d)
 
 	if err != nil {
 		return errors.New(fmt.Sprintf("failed to retrieve tables for database %s: %s", d, err.Error()))
@@ -76,29 +76,35 @@ func (dump *Dump) database(d string) error {
 	return nil
 }
 
-func (dump *Dump) table(d string, t response.GetDatabaseTablesResponseTable) error {
-	err := dump.r.WriteStruct(Table{
-		Name:   t.Name,
-		Fields: t.Fields,
+func (dump *Dump) table(d string, t string) error {
+	r, err := dump.c.GetDatabaseTable(d, t)
+
+	if err != nil {
+		return err
+	}
+
+	err = dump.r.WriteStruct(toolsutil.Table{
+		Name:   r.TableName,
+		Fields: r.Fields,
 	})
 
 	if err != nil {
 		return err
 	}
 
-	max, err := dump.getMaxObjectId(d, t.Name)
+	max, err := dump.getMaxObjectId(d, r.TableName)
 
 	if err != nil {
-		return errors.New(fmt.Sprintf("failed to retrieve max object id for table %s in database %s: %s", t.Name, d, err.Error()))
+		return errors.New(fmt.Sprintf("failed to retrieve max object id for table %s in database %s: %s", r.TableName, d, err.Error()))
 	}
 
 	if *max >= 0 {
-		dump.r.ProgressStart(fmt.Sprintf("[%s] %s", d, t.Name), (*max)+1)
+		dump.r.ProgressStart(fmt.Sprintf("[%s] %s", d, r.TableName), (*max)+1)
 
 		var step int64 = 10000
 
 		for i := int64(0); i <= *max; i += step {
-			err = dump.objects(d, t.Name, i, step)
+			err = dump.objects(d, r.TableName, i, step)
 
 			if err != nil {
 				return err
@@ -171,7 +177,7 @@ func (dump *Dump) getMaxObjectId(d string, t string) (*int64, error) {
 	return util.Ptr(int64(-1)), nil
 }
 
-func (dump *Dump) getObjects(d string, t string, start int64, count int64) ([]Object, error) {
+func (dump *Dump) getObjects(d string, t string, start int64, count int64) ([]toolsutil.Object, error) {
 	res, err := dump.c.GetFromDatabaseTable(d, t, request.Request{
 		Query: &request.Query{
 			Where: &request.Where{
@@ -182,7 +188,7 @@ func (dump *Dump) getObjects(d string, t string, start int64, count int64) ([]Ob
 		},
 	})
 
-	var objects []Object
+	var objects []toolsutil.Object
 
 	for _, r := range res.Results {
 		objects = append(objects, r)

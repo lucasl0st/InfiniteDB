@@ -7,7 +7,7 @@ package errors
 import (
 	"errors"
 	"fmt"
-	"github.com/lucasl0st/InfiniteDB/request"
+	"github.com/lucasl0st/InfiniteDB/models/request"
 )
 
 func CannotFindField(fieldName string) error {

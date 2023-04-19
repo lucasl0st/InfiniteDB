@@ -10,9 +10,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	e "github.com/lucasl0st/InfiniteDB/errors"
-	"github.com/lucasl0st/InfiniteDB/request"
-	"github.com/lucasl0st/InfiniteDB/response"
+	e "github.com/lucasl0st/InfiniteDB/models/errors"
+	"github.com/lucasl0st/InfiniteDB/models/request"
+	"github.com/lucasl0st/InfiniteDB/models/response"
+	"github.com/lucasl0st/InfiniteDB/util"
 	"math/rand"
 	"net/http"
 	"nhooyr.io/websocket"
@@ -45,23 +46,23 @@ type Client struct {
 
 func New(options Options) *Client {
 	if options.TLS == nil {
-		options.TLS = ptr(false)
+		options.TLS = util.Ptr(false)
 	}
 
 	if options.SkipTLSVerify == nil {
-		options.SkipTLSVerify = ptr(false)
+		options.SkipTLSVerify = util.Ptr(false)
 	}
 
 	if options.Timeout == nil {
-		options.Timeout = ptr(time.Second * 10)
+		options.Timeout = util.Ptr(time.Second * 10)
 	}
 
 	if options.ReadLimit == nil {
-		options.ReadLimit = ptr(int64(1000 * 1000 * 1000))
+		options.ReadLimit = util.Ptr(int64(1000 * 1000 * 1000))
 	}
 
 	if options.PanicOnConnectionError == nil {
-		options.PanicOnConnectionError = ptr(true)
+		options.PanicOnConnectionError = util.Ptr(true)
 	}
 
 	return &Client{
@@ -347,24 +348,25 @@ func (c *Client) GetDatabase(name string) (response.GetDatabaseResponse, error) 
 	return getDatabaseResponse, nil
 }
 
-func (c *Client) GetDatabaseTables(name string) (response.GetDatabaseTablesResponse, error) {
+func (c *Client) GetDatabaseTable(name string, tableName string) (response.GetDatabaseTableResponse, error) {
 	r := make(map[string]interface{})
 
-	r["method"] = "getDatabaseTables"
+	r["method"] = "getDatabaseTable"
 	r["name"] = name
+	r["tableName"] = tableName
 
 	res, err := c.sendRequest(r)
 
 	if err != nil {
-		return response.GetDatabaseTablesResponse{}, err
+		return response.GetDatabaseTableResponse{}, err
 	}
 
-	var getDatabaseTablesResponse response.GetDatabaseTablesResponse
+	var getDatabaseTablesResponse response.GetDatabaseTableResponse
 
 	err = mapToStruct(res, &getDatabaseTablesResponse)
 
 	if err != nil {
-		return response.GetDatabaseTablesResponse{}, err
+		return response.GetDatabaseTableResponse{}, err
 	}
 
 	return getDatabaseTablesResponse, nil
