@@ -2,7 +2,7 @@
  * Copyright (c) 2023 Lucas Pape
  */
 
-package server
+package main
 
 import (
 	"errors"

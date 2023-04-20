@@ -2,14 +2,15 @@
  * Copyright (c) 2023 Lucas Pape
  */
 
-package server
+package main
 
 import (
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/lucasl0st/InfiniteDB/idblib"
-	"github.com/lucasl0st/InfiniteDB/request"
+	"github.com/lucasl0st/InfiniteDB/models/request"
+	"github.com/lucasl0st/InfiniteDB/server/util"
 	"io"
 	"net/http"
 )
@@ -39,7 +40,7 @@ func (h *HttpApi) registerHandlers(r *gin.Engine) {
 	r.POST(apiPrefix+"/database", h.createDatabaseHandler)
 	r.DELETE(apiPrefix+"/database/:name", h.deleteDatabaseHandler)
 	r.GET(apiPrefix+"/database/:name", h.getDatabaseHandler)
-	r.GET(apiPrefix+"/database/:name/tables", h.getDatabaseTablesHandler)
+	r.GET(apiPrefix+"/database/:name/table/:tableName", h.getDatabaseTableHandler)
 	r.POST(apiPrefix+"/database/:name/table", h.createTableInDatabaseHandler)
 	r.DELETE(apiPrefix+"/database/:name/table/:tableName", h.deleteTableInDatabaseHandler)
 	r.POST(apiPrefix+"/database/:name/table/:tableName/get", h.getFromDatabaseTableHandler)
@@ -158,7 +159,7 @@ func (h *HttpApi) getDatabaseHandler(c *gin.Context) {
 	}
 }
 
-func (h *HttpApi) getDatabaseTablesHandler(c *gin.Context) {
+func (h *HttpApi) getDatabaseTableHandler(c *gin.Context) {
 	name := c.Param("name")
 
 	err := validateName(name)
@@ -168,7 +169,16 @@ func (h *HttpApi) getDatabaseTablesHandler(c *gin.Context) {
 		return
 	}
 
-	results, err := h.idb.GetDatabaseTables(name)
+	tableName := c.Param("tableName")
+
+	err = validateName(tableName)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
+		return
+	}
+
+	results, err := h.idb.GetDatabaseTable(name, tableName)
 
 	if err == nil {
 		c.JSON(http.StatusOK, results)
@@ -217,7 +227,7 @@ func (h *HttpApi) createTableInDatabaseHandler(c *gin.Context) {
 		if !isMap {
 			o = request.TableOptions{}
 		} else {
-			err := toStruct(options, &o)
+			err := util.ToStruct(options, &o)
 
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
@@ -226,7 +236,7 @@ func (h *HttpApi) createTableInDatabaseHandler(c *gin.Context) {
 		}
 
 		var f map[string]request.Field
-		err = toStruct(fields, &f)
+		err = util.ToStruct(fields, &f)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})

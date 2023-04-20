@@ -4,7 +4,9 @@
 
 package field
 
-import "github.com/lucasl0st/InfiniteDB/request"
+import (
+	"github.com/lucasl0st/InfiniteDB/models/request"
+)
 
 type Field struct {
 	Name    string       `json:"name"`

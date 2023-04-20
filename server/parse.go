@@ -2,15 +2,15 @@
  * Copyright (c) 2023 Lucas Pape
  */
 
-package server
+package main
 
 import (
 	"encoding/json"
-	e "github.com/lucasl0st/InfiniteDB/errors"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/functions"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
-	"github.com/lucasl0st/InfiniteDB/request"
+	e "github.com/lucasl0st/InfiniteDB/models/errors"
+	"github.com/lucasl0st/InfiniteDB/models/request"
 )
 
 func parseRequest(r request.Request) (*table.Request, error) {

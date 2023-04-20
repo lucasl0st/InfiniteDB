@@ -2,10 +2,10 @@
  * Copyright (c) 2023 Lucas Pape
  */
 
-package server
+package main
 
 import (
-	e "github.com/lucasl0st/InfiniteDB/errors"
+	e "github.com/lucasl0st/InfiniteDB/models/errors"
 	"strings"
 )
 

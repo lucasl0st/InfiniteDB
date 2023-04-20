@@ -7,9 +7,9 @@ package storage
 import (
 	"bufio"
 	"github.com/fsnotify/fsnotify"
-	e "github.com/lucasl0st/InfiniteDB/errors"
 	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
-	"github.com/lucasl0st/InfiniteDB/util"
+	"github.com/lucasl0st/InfiniteDB/idblib/util"
+	e "github.com/lucasl0st/InfiniteDB/models/errors"
 	"os"
 	"time"
 )

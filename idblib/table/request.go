@@ -6,7 +6,7 @@ package table
 
 import (
 	"encoding/json"
-	"github.com/lucasl0st/InfiniteDB/request"
+	"github.com/lucasl0st/InfiniteDB/models/request"
 )
 
 type Request struct {

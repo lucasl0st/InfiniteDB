@@ -23,7 +23,3 @@ func mapToStruct[Type any](m map[string]interface{}, r *Type) error {
 
 	return nil
 }
-
-func ptr[T any](v T) *T {
-	return &v
-}

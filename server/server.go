@@ -2,16 +2,16 @@
  * Copyright (c) 2023 Lucas Pape
  */
 
-package server
+package main
 
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	e "github.com/lucasl0st/InfiniteDB/errors"
 	"github.com/lucasl0st/InfiniteDB/idblib"
 	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
-	"github.com/lucasl0st/InfiniteDB/util"
+	"github.com/lucasl0st/InfiniteDB/idblib/util"
+	e "github.com/lucasl0st/InfiniteDB/models/errors"
 )
 
 var l util.Logger

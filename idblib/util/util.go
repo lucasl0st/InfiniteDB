@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	e "github.com/lucasl0st/InfiniteDB/errors"
 	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
+	e "github.com/lucasl0st/InfiniteDB/models/errors"
 	"strconv"
 )
 

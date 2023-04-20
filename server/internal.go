@@ -2,7 +2,7 @@
  * Copyright (c) 2023 Lucas Pape
  */
 
-package server
+package main
 
 import (
 	"encoding/json"
@@ -11,7 +11,7 @@ import (
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
 	"github.com/lucasl0st/InfiniteDB/idblib/util"
-	"github.com/lucasl0st/InfiniteDB/request"
+	"github.com/lucasl0st/InfiniteDB/models/request"
 )
 
 const InternalDatabase = "internal"
@@ -23,14 +23,14 @@ const AuthenticationTableFieldKeyValue = "keyValue"
 const AuthenticationKeyMain = "main"
 
 func SetupAuthenticationTable(idb *idblib.IDB) error {
-	r, err := idb.GetDatabaseTables(InternalDatabase)
+	r, err := idb.GetDatabase(InternalDatabase)
 
 	if err != nil {
 		return err
 	}
 
 	for _, t := range r.Tables {
-		if t.Name == AuthenticationTable {
+		if t == AuthenticationTable {
 			return nil
 		}
 	}

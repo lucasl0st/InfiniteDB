@@ -2,17 +2,18 @@
  * Copyright (c) 2023 Lucas Pape
  */
 
-package server
+package main
 
 import (
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	e "github.com/lucasl0st/InfiniteDB/errors"
 	"github.com/lucasl0st/InfiniteDB/idblib"
-	"github.com/lucasl0st/InfiniteDB/idblib/util"
-	"github.com/lucasl0st/InfiniteDB/request"
+	idbutil "github.com/lucasl0st/InfiniteDB/idblib/util"
+	e "github.com/lucasl0st/InfiniteDB/models/errors"
+	"github.com/lucasl0st/InfiniteDB/models/request"
+	"github.com/lucasl0st/InfiniteDB/server/util"
 	"net/http"
 	"time"
 )
@@ -48,7 +49,7 @@ func (w *WebsocketApi) handler(c *gin.Context, rw http.ResponseWriter, r *http.R
 
 	conn.SetReadLimit(w.readLimit)
 
-	w.send(conn, 0, util.InterfaceMapToJsonRawMap(gin.H{
+	w.send(conn, 0, idbutil.InterfaceMapToJsonRawMap(gin.H{
 		"message":          "HELO",
 		"status":           http.StatusOK,
 		"database_version": VERSION,
@@ -58,7 +59,7 @@ func (w *WebsocketApi) handler(c *gin.Context, rw http.ResponseWriter, r *http.R
 		_, bytes, err := conn.ReadMessage()
 
 		if err != nil {
-			closed := w.send(conn, 0, util.InterfaceMapToJsonRawMap(gin.H{
+			closed := w.send(conn, 0, idbutil.InterfaceMapToJsonRawMap(gin.H{
 				"status":  http.StatusInternalServerError,
 				"message": "failed to read message",
 			}))
@@ -75,7 +76,7 @@ func (w *WebsocketApi) handler(c *gin.Context, rw http.ResponseWriter, r *http.R
 		}
 
 		if body != nil {
-			m := util.JsonRawMapToInterfaceMap(*body)
+			m := idbutil.JsonRawMapToInterfaceMap(*body)
 
 			requestId := m["requestId"]
 
@@ -84,7 +85,7 @@ func (w *WebsocketApi) handler(c *gin.Context, rw http.ResponseWriter, r *http.R
 					return
 				}
 			} else {
-				if w.send(conn, 0, util.InterfaceMapToJsonRawMap(gin.H{
+				if w.send(conn, 0, idbutil.InterfaceMapToJsonRawMap(gin.H{
 					"status":  http.StatusInternalServerError,
 					"message": "every request must have a requestId",
 				})) {
@@ -100,7 +101,7 @@ func (w *WebsocketApi) getBody(conn *websocket.Conn, bytes []byte) (*map[string]
 	err := json.Unmarshal(bytes, &r)
 
 	if err != nil {
-		return nil, w.send(conn, 0, util.InterfaceMapToJsonRawMap(gin.H{
+		return nil, w.send(conn, 0, idbutil.InterfaceMapToJsonRawMap(gin.H{
 			"status":  http.StatusInternalServerError,
 			"message": "failed to parse JSON",
 		}))
@@ -110,7 +111,7 @@ func (w *WebsocketApi) getBody(conn *websocket.Conn, bytes []byte) (*map[string]
 }
 
 func (w *WebsocketApi) send(conn *websocket.Conn, requestId int64, m map[string]json.RawMessage) bool {
-	m["requestId"] = util.Int64ToJsonRaw(requestId)
+	m["requestId"] = idbutil.Int64ToJsonRaw(requestId)
 
 	err := conn.WriteJSON(m)
 
@@ -151,8 +152,8 @@ func (w *WebsocketApi) methodHandler(
 			closed, status = w.deleteDatabaseHandler(conn, requestId, m)
 		case "getDatabase":
 			closed, status = w.getDatabaseHandler(conn, requestId, m)
-		case "getDatabaseTables":
-			closed, status = w.getDatabaseTablesHandler(conn, requestId, m)
+		case "getDatabaseTable":
+			closed, status = w.getDatabaseTableHandler(conn, requestId, m)
 		case "createTableInDatabase":
 			closed, status = w.createTableInDatabaseHandler(conn, requestId, m)
 		case "deleteTableInDatabase":
@@ -166,7 +167,7 @@ func (w *WebsocketApi) methodHandler(
 		case "updateInDatabaseTable":
 			closed, status = w.updateInDatabaseTableHandler(conn, requestId, m, r)
 		default:
-			closed = w.send(conn, requestId, util.InterfaceMapToJsonRawMap(gin.H{
+			closed = w.send(conn, requestId, idbutil.InterfaceMapToJsonRawMap(gin.H{
 				"status":  http.StatusInternalServerError,
 				"message": "method not found",
 			}))
@@ -177,7 +178,7 @@ func (w *WebsocketApi) methodHandler(
 			w.logHandler(method.(string), status, since, clientIp, requestId)
 		}
 	} else {
-		closed = w.send(conn, requestId, util.InterfaceMapToJsonRawMap(gin.H{
+		closed = w.send(conn, requestId, idbutil.InterfaceMapToJsonRawMap(gin.H{
 			"status":  http.StatusInternalServerError,
 			"message": "no method specified",
 		}))
@@ -193,7 +194,7 @@ func (w *WebsocketApi) getDatabasesHandler(conn *websocket.Conn, requestId int64
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	m, err := toMap(results)
+	m, err := util.ToMap(results)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -221,7 +222,7 @@ func (w *WebsocketApi) createDatabaseHandler(conn *websocket.Conn, requestId int
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	m, err := toMap(results)
+	m, err := util.ToMap(results)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -249,7 +250,7 @@ func (w *WebsocketApi) deleteDatabaseHandler(conn *websocket.Conn, requestId int
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	m, err := toMap(results)
+	m, err := util.ToMap(results)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -277,7 +278,7 @@ func (w *WebsocketApi) getDatabaseHandler(conn *websocket.Conn, requestId int64,
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	m, err := toMap(results)
+	m, err := util.ToMap(results)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -286,7 +287,7 @@ func (w *WebsocketApi) getDatabaseHandler(conn *websocket.Conn, requestId int64,
 	return w.sendResults(conn, requestId, &m, err)
 }
 
-func (w *WebsocketApi) getDatabaseTablesHandler(conn *websocket.Conn, requestId int64, r map[string]interface{}) (bool, int) {
+func (w *WebsocketApi) getDatabaseTableHandler(conn *websocket.Conn, requestId int64, r map[string]interface{}) (bool, int) {
 	name, isString := r["name"].(string)
 
 	if !isString {
@@ -299,13 +300,25 @@ func (w *WebsocketApi) getDatabaseTablesHandler(conn *websocket.Conn, requestId 
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	results, err := w.idb.GetDatabaseTables(name)
+	tableName, isString := r["tableName"].(string)
+
+	err = validateName(tableName)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	m, err := toMap(results)
+	if !isString {
+		return w.sendResults(conn, requestId, nil, e.IsNotAString("tableName"))
+	}
+
+	results, err := w.idb.GetDatabaseTable(name, tableName)
+
+	if err != nil {
+		return w.sendResults(conn, requestId, nil, err)
+	}
+
+	m, err := util.ToMap(results)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -351,7 +364,7 @@ func (w *WebsocketApi) createTableInDatabaseHandler(conn *websocket.Conn, reques
 	if !isMap {
 		o = request.TableOptions{}
 	} else {
-		err := toStruct(options, &o)
+		err = util.ToStruct(options, &o)
 
 		if err != nil {
 			return w.sendResults(conn, requestId, nil, err)
@@ -359,7 +372,7 @@ func (w *WebsocketApi) createTableInDatabaseHandler(conn *websocket.Conn, reques
 	}
 
 	var f map[string]request.Field
-	err = toStruct(fields, &f)
+	err = util.ToStruct(fields, &f)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -377,7 +390,7 @@ func (w *WebsocketApi) createTableInDatabaseHandler(conn *websocket.Conn, reques
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	m, err := toMap(results)
+	m, err := util.ToMap(results)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -417,7 +430,7 @@ func (w *WebsocketApi) deleteTableInDatabaseHandler(conn *websocket.Conn, reques
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	m, err := toMap(results)
+	m, err := util.ToMap(results)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -457,7 +470,7 @@ func (w *WebsocketApi) getFromDatabaseTableHandler(
 	}
 
 	var req request.Request
-	err = toStruct(r["request"], &req)
+	err = util.ToStruct(r["request"], &req)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -475,7 +488,7 @@ func (w *WebsocketApi) getFromDatabaseTableHandler(
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	rm, err := toMap(results)
+	rm, err := util.ToMap(results)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -515,7 +528,7 @@ func (w *WebsocketApi) insertToDatabaseTableHandler(
 	}
 
 	var o map[string]json.RawMessage
-	err = toStruct(r["object"], &o)
+	err = util.ToStruct(r["object"], &o)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -527,7 +540,7 @@ func (w *WebsocketApi) insertToDatabaseTableHandler(
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	rm, err := toMap(results)
+	rm, err := util.ToMap(results)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -567,7 +580,7 @@ func (w *WebsocketApi) removeFromDatabaseTableHandler(
 	}
 
 	var req request.Request
-	err = toStruct(r["request"], &req)
+	err = util.ToStruct(r["request"], &req)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -585,7 +598,7 @@ func (w *WebsocketApi) removeFromDatabaseTableHandler(
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	rm, err := toMap(results)
+	rm, err := util.ToMap(results)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -625,7 +638,7 @@ func (w *WebsocketApi) updateInDatabaseTableHandler(
 	}
 
 	var o map[string]json.RawMessage
-	err = toStruct(r["object"], &o)
+	err = util.ToStruct(r["object"], &o)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -637,7 +650,7 @@ func (w *WebsocketApi) updateInDatabaseTableHandler(
 		return w.sendResults(conn, requestId, nil, err)
 	}
 
-	rm, err := toMap(results)
+	rm, err := util.ToMap(results)
 
 	if err != nil {
 		return w.sendResults(conn, requestId, nil, err)
@@ -649,11 +662,11 @@ func (w *WebsocketApi) updateInDatabaseTableHandler(
 func (w *WebsocketApi) sendResults(conn *websocket.Conn, requestId int64, results *map[string]json.RawMessage, err error) (bool, int) {
 	if err == nil && results != nil {
 		r := *results
-		r["status"] = util.InterfaceToJsonRaw(http.StatusOK)
+		r["status"] = idbutil.InterfaceToJsonRaw(http.StatusOK)
 
 		return w.send(conn, requestId, r), http.StatusOK
 	} else {
-		return w.send(conn, requestId, util.InterfaceMapToJsonRawMap(gin.H{
+		return w.send(conn, requestId, idbutil.InterfaceMapToJsonRawMap(gin.H{
 			"status":  http.StatusInternalServerError,
 			"message": fmt.Sprint(err),
 		})), http.StatusInternalServerError
