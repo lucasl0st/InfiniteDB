@@ -14,13 +14,17 @@ import (
 	"syscall"
 )
 
+var s *server.Server
+
 func main() {
+	var err error
 	var metricsReceiver metrics.Receiver = &util.MetricsReceiver{}
 
-	s, err := server.New(
+	s, err = server.New(
 		util.LoggerWithPrefix{Prefix: "[InfiniteDB]"},
 		util.LoggerWithPrefix{Prefix: "[idblib]"},
 		&metricsReceiver,
+		shutdown,
 	)
 
 	sigChan := make(chan os.Signal, 1)
@@ -33,9 +37,7 @@ func main() {
 	go func() {
 		_ = <-sigChan
 
-		s.Kill()
-
-		os.Exit(0)
+		shutdown()
 	}()
 
 	if err != nil {
@@ -48,4 +50,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
+}
+
+func shutdown() {
+	s.Kill()
+
+	os.Exit(0)
 }

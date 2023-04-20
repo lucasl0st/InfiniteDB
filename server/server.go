@@ -24,7 +24,12 @@ type Server struct {
 	r   *gin.Engine
 }
 
-func New(logger util.Logger, idbLogger util.Logger, metricsReceiver *metrics.Receiver) (*Server, error) {
+func New(
+	logger util.Logger,
+	idbLogger util.Logger,
+	metricsReceiver *metrics.Receiver,
+	shutdown func(),
+) (*Server, error) {
 	l = logger
 	config, err := LoadConfig()
 
@@ -59,10 +64,19 @@ func New(logger util.Logger, idbLogger util.Logger, metricsReceiver *metrics.Rec
 
 	r := gin.Default()
 
-	httpApi := HttpApi{idb: idb, authentication: config.Authentication}
+	httpApi := HttpApi{
+		idb:            idb,
+		authentication: config.Authentication,
+		shutdown:       shutdown,
+	}
 	httpApi.Run(r)
 
-	websocketApi := WebsocketApi{idb: idb, logging: config.RequestLogging, readLimit: config.WebsocketReadLimit}
+	websocketApi := WebsocketApi{
+		idb:       idb,
+		logging:   config.RequestLogging,
+		readLimit: config.WebsocketReadLimit,
+		shutdown:  shutdown,
+	}
 	websocketApi.Run(r)
 
 	return &Server{

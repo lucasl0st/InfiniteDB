@@ -20,6 +20,7 @@ const apiPrefix = ""
 type HttpApi struct {
 	idb            *idblib.IDB
 	authentication bool
+	shutdown       func()
 }
 
 func (h *HttpApi) Run(r *gin.Engine) {
@@ -35,6 +36,7 @@ func (h *HttpApi) registerHandlers(r *gin.Engine) {
 
 	r.GET(apiPrefix+"/health", h.healthHandler)
 	r.GET(apiPrefix+"/version", h.versionHandler)
+	r.GET(apiPrefix+"/shutdown", h.shutdownHandler)
 
 	r.GET(apiPrefix+"/databases", h.getDatabasesHandler)
 	r.POST(apiPrefix+"/database", h.createDatabaseHandler)
@@ -81,6 +83,10 @@ func (h *HttpApi) healthHandler(c *gin.Context) {
 
 func (h *HttpApi) versionHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"database_version": VERSION})
+}
+
+func (h *HttpApi) shutdownHandler(_ *gin.Context) {
+	h.shutdown()
 }
 
 func (h *HttpApi) getDatabasesHandler(c *gin.Context) {
