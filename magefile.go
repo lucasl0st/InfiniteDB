@@ -256,6 +256,90 @@ func Build_windows() error {
 	return err
 }
 
+func Test() error {
+	return sh.RunV("go", "test", "-v", "-coverprofile", "cover.out", "./...")
+}
+
+func Integration_tests() error {
+	root, err := os.Getwd()
+
+	if err != nil {
+		return err
+	}
+
+	out, err := filepath.Abs(buildDir + "/server_integration_test")
+
+	if err != nil {
+		return err
+	}
+
+	coverageOutDir, err := filepath.Abs("./integration_tests_coverage_out")
+
+	if err != nil {
+		return err
+	}
+
+	if _, err = os.Stat(coverageOutDir); !os.IsNotExist(err) {
+		err = os.RemoveAll(coverageOutDir)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	err = os.Mkdir(coverageOutDir, os.ModePerm)
+
+	if err != nil {
+		return err
+	}
+
+	err = os.Chdir("server/cmd/")
+
+	if err != nil {
+		return err
+	}
+
+	err = sh.RunV("go", "build", "-cover", "-o", out, "-coverpkg=all")
+
+	if err != nil {
+		return err
+	}
+
+	err = os.Chdir(root)
+
+	if err != nil {
+		return err
+	}
+
+	err = os.Chdir("integration_tests/")
+
+	if err != nil {
+		return err
+	}
+
+	err = sh.RunV("go", "run", "cmd/main.go", out, coverageOutDir)
+
+	if err != nil {
+		return err
+	}
+
+	out, err = sh.Output("go", "tool", "covdata", "percent", "-i", coverageOutDir)
+
+	if err != nil {
+		return err
+	}
+
+	lines := strings.Split(out, "\n")
+
+	for _, l := range lines {
+		if strings.Contains(l, "github.com/lucasl0st/InfiniteDB") {
+			fmt.Println(l)
+		}
+	}
+
+	return nil
+}
+
 func Clean() error {
 	return os.RemoveAll(buildDir)
 }
@@ -288,7 +372,7 @@ func buildForOs(o operating_system) ([]result, error) {
 	return results, nil
 }
 
-func buildForRunningArch() ([]result, error) {
+func getRunningTarget() (*target, error) {
 	var t *target = nil
 
 	for _, supportedTarget := range supportedTargets {
@@ -302,13 +386,23 @@ func buildForRunningArch() ([]result, error) {
 		return nil, errors.New("this architecture or operating system is not supported")
 	}
 
+	return t, nil
+}
+
+func buildForRunningArch() ([]result, error) {
+	t, err := getRunningTarget()
+
+	if err != nil {
+		return nil, err
+	}
+
 	return buildServerAndTools(*t)
 }
 
 func buildServerAndTools(t target) ([]result, error) {
 	var results []result
 
-	r, err := buildGo(t, "./server", binaryName)
+	r, err := buildGo(t, "./server/cmd", binaryName)
 
 	if err != nil {
 		return nil, err

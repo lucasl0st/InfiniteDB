@@ -27,6 +27,7 @@ type WebsocketApi struct {
 	idb       *idblib.IDB
 	logging   bool
 	readLimit int64
+	shutdown  func()
 }
 
 func (w *WebsocketApi) Run(r *gin.Engine) {
@@ -144,6 +145,8 @@ func (w *WebsocketApi) methodHandler(
 
 	if method != nil {
 		switch method.(string) {
+		case "shutdown":
+			closed, status = w.shutdownHandler(conn, requestId)
 		case "getDatabases":
 			closed, status = w.getDatabasesHandler(conn, requestId)
 		case "createDatabase":
@@ -185,6 +188,12 @@ func (w *WebsocketApi) methodHandler(
 	}
 
 	return closed
+}
+
+func (w *WebsocketApi) shutdownHandler(_ *websocket.Conn, _ int64) (bool, int) {
+	w.shutdown()
+
+	return false, 0
 }
 
 func (w *WebsocketApi) getDatabasesHandler(conn *websocket.Conn, requestId int64) (bool, int) {

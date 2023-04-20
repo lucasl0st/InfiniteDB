@@ -21,3 +21,4 @@ databases*/
 *.key
 *.crt
 build/
+integration_tests_coverage_out/

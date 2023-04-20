@@ -150,7 +150,7 @@ func (c *Client) read() {
 		_, data, err := c.ws.Read(c.ctx)
 
 		if err != nil {
-			if c.panicOnConnectionError {
+			if c.panicOnConnectionError && c.connected {
 				panic(err.Error())
 			}
 
@@ -255,6 +255,36 @@ func (c *Client) getChannel(requestId int64) chan RequestResult {
 	}
 
 	return ch
+}
+
+func (c *Client) ShutdownServer() error {
+	if !c.connected {
+		return e.ClientNotConnected()
+	}
+
+	r := make(map[string]interface{})
+
+	r["method"] = "shutdown"
+
+	requestId := int64(float64(rand.Int()))
+
+	r["requestId"] = requestId
+
+	data, err := json.Marshal(r)
+
+	if err != nil {
+		return err
+	}
+
+	err = c.ws.Write(c.ctx, websocket.MessageText, data)
+
+	if err != nil {
+		return err
+	}
+
+	c.connected = false
+
+	return nil
 }
 
 func (c *Client) GetDatabases() (response.GetDatabasesResponse, error) {
