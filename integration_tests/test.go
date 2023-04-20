@@ -12,3 +12,10 @@ type Test struct {
 	Name string
 	Run  func(c *client.Client) error
 }
+
+func init() {
+	Tests = append(Tests, Test{
+		Name: "covid-19",
+		Run:  runCovid19Tests,
+	})
+}
