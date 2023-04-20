@@ -180,7 +180,7 @@ func (c *Client) read() {
 
 			if c.getChannel(requestId) != nil {
 				c.getChannel(requestId) <- r
-			} else {
+			} else if c.connected {
 				panic(r.Err)
 			}
 		}
@@ -207,7 +207,7 @@ func (c *Client) sendRequest(request map[string]interface{}) (map[string]interfa
 	err = c.ws.Write(c.ctx, websocket.MessageText, data)
 
 	if err != nil {
-		if c.panicOnConnectionError {
+		if c.panicOnConnectionError && c.connected {
 			panic(err.Error())
 		}
 
@@ -233,7 +233,7 @@ func (c *Client) getResponse(requestId int64) (map[string]interface{}, error) {
 	case <-time.After(c.timeout):
 		err := e.TimeoutReceivingDatabaseResult(requestId)
 
-		if c.panicOnConnectionError {
+		if c.panicOnConnectionError && c.connected {
 			panic(err.Error())
 		}
 
