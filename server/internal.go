@@ -2,7 +2,7 @@
  * Copyright (c) 2023 Lucas Pape
  */
 
-package main
+package server
 
 import (
 	"encoding/json"
