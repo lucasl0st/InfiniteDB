@@ -5,10 +5,11 @@
 package cmd
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"github.com/lucasl0st/InfiniteDB/client"
-	"github.com/lucasl0st/InfiniteDB/tools/idbdump/dump"
+	_import "github.com/lucasl0st/InfiniteDB/tools/idbimport/import"
 	"github.com/lucasl0st/InfiniteDB/util"
 	"github.com/spf13/cobra"
 	"os"
@@ -18,10 +19,10 @@ import (
 // fileCmd represents the file command
 var fileCmd = &cobra.Command{
 	Use:   "file",
-	Short: "Dump idb database into a single file",
-	Long:  "Dump idb database into a single file",
+	Short: "Import idb database from a single file",
+	Long:  "Import idb database from a single file",
 	Run: func(cmd *cobra.Command, args []string) {
-		err := dumpToFile()
+		err := importFromFile()
 
 		if err != nil {
 			fmt.Println(err.Error())
@@ -31,21 +32,21 @@ var fileCmd = &cobra.Command{
 }
 
 var (
-	outputFile string
+	inputFile string
 )
 
 func init() {
 	fileCmd.Flags().SortFlags = false
 
-	fileCmd.Flags().StringVarP(&outputFile, "output-file", "o", "", "output file for dump")
+	fileCmd.Flags().StringVarP(&inputFile, "input-file", "i", "", "input dump file")
 
-	_ = fileCmd.MarkFlagFilename("output-file")
-	_ = fileCmd.MarkFlagRequired("output-file")
+	_ = fileCmd.MarkFlagFilename("input-file")
+	_ = fileCmd.MarkFlagRequired("input-file")
 
 	rootCmd.AddCommand(fileCmd)
 }
 
-func dumpToFile() error {
+func importFromFile() error {
 	c := client.New(client.Options{
 		Hostname:      databaseHostname,
 		Port:          databasePort,
@@ -56,11 +57,11 @@ func dumpToFile() error {
 		ReadLimit:     util.Ptr(databaseReadLimit),
 	})
 
-	if _, err := os.Stat(outputFile); err == nil {
-		return errors.New(fmt.Sprintf("the output file %s already exists, not overwriting", outputFile))
+	if _, err := os.Stat(inputFile); err != nil {
+		return errors.New(fmt.Sprintf("the input file %s does not exist", inputFile))
 	}
 
-	f, err := os.OpenFile(outputFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, os.ModePerm)
+	f, err := os.OpenFile(inputFile, os.O_RDONLY, os.ModePerm)
 
 	if err != nil {
 		return err
@@ -70,11 +71,10 @@ func dumpToFile() error {
 		err = f.Close()
 	}()
 
-	r := dump.FileReceiver{File: f}
+	s := *bufio.NewScanner(f)
+	i := _import.New(c, s)
 
-	d := dump.New(c, r)
-
-	err = d.Dump()
+	err = i.Import()
 
 	if err != nil {
 		return err

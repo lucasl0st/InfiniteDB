@@ -53,6 +53,10 @@ func (dump *Dump) Dump() error {
 }
 
 func (dump *Dump) database(d string) error {
+	if d == "internal" {
+		return nil
+	}
+
 	err := dump.r.WriteStruct(toolsutil.Database{Name: d})
 
 	if err != nil {

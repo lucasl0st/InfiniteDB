@@ -17,8 +17,8 @@ func NotAValidFunction() error {
 	return errors.New("not a valid function")
 }
 
-func TypeNotSupported() error {
-	return errors.New("type not supported")
+func TypeNotSupported(t string) error {
+	return errors.New(fmt.Sprintf("type %s not supported", t))
 }
 
 func FieldCannotBeUniqueWithoutBeingIndexed() error {

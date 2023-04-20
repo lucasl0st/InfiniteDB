@@ -125,7 +125,7 @@ func parseFields(fields map[string]request.Field) (map[string]field.Field, error
 		t = field.ParseDatabaseType(f.Type)
 
 		if t == nil {
-			return nil, e.TypeNotSupported()
+			return nil, e.TypeNotSupported(f.Type)
 		}
 
 		if f.Indexed != nil {

@@ -24,6 +24,7 @@ const buildDir = "build"
 var tools = []string{
 	"idbdump",
 	"idbcli",
+	"idbimport",
 }
 
 type dockerImage struct {
