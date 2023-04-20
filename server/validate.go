@@ -2,7 +2,7 @@
  * Copyright (c) 2023 Lucas Pape
  */
 
-package main
+package server
 
 import (
 	e "github.com/lucasl0st/InfiniteDB/models/errors"

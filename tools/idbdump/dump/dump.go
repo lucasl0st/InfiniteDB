@@ -12,6 +12,7 @@ import (
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	idbutil "github.com/lucasl0st/InfiniteDB/idblib/util"
 	"github.com/lucasl0st/InfiniteDB/models/request"
+	"github.com/lucasl0st/InfiniteDB/server"
 	toolsutil "github.com/lucasl0st/InfiniteDB/tools/util"
 	"github.com/lucasl0st/InfiniteDB/util"
 )
@@ -53,7 +54,7 @@ func (dump *Dump) Dump() error {
 }
 
 func (dump *Dump) database(d string) error {
-	if d == "internal" {
+	if d == server.InternalDatabase {
 		return nil
 	}
 
