@@ -13,9 +13,9 @@ const (
 )
 
 var databaseTypesMap = map[string]DatabaseType{
-	"boolean": BOOL,
-	"number":  NUMBER,
-	"text":    TEXT,
+	"bool":   BOOL,
+	"number": NUMBER,
+	"text":   TEXT,
 }
 
 func ParseDatabaseType(s string) *DatabaseType {
