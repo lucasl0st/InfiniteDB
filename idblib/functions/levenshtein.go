@@ -9,7 +9,7 @@ import (
 	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/object"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
-	"github.com/lucasl0st/InfiniteDB/idblib/util"
+	"github.com/lucasl0st/InfiniteDB/util"
 )
 
 const fieldNameLevenshtein = "levenshtein"

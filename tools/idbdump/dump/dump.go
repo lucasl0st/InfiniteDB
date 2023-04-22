@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"github.com/lucasl0st/InfiniteDB/client"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
-	idbutil "github.com/lucasl0st/InfiniteDB/idblib/util"
 	"github.com/lucasl0st/InfiniteDB/models/request"
 	"github.com/lucasl0st/InfiniteDB/server"
 	toolsutil "github.com/lucasl0st/InfiniteDB/tools/util"
@@ -156,8 +155,8 @@ func (dump *Dump) getMaxObjectId(d string, t string) (*int64, error) {
 				{
 					Function: "max",
 					Parameters: util.Ptr(map[string]json.RawMessage{
-						"fieldName": idbutil.StringToJsonRaw(field.InternalObjectIdField),
-						"as":        idbutil.StringToJsonRaw(as),
+						"fieldName": util.StringToJsonRaw(field.InternalObjectIdField),
+						"as":        util.StringToJsonRaw(as),
 					}),
 				},
 			},
@@ -170,7 +169,7 @@ func (dump *Dump) getMaxObjectId(d string, t string) (*int64, error) {
 	}
 
 	for _, r := range res.Results {
-		m := idbutil.JsonRawMapToInterfaceMap(r)
+		m := util.JsonRawMapToInterfaceMap(r)
 
 		max, ok := m[as].(float64)
 
@@ -188,7 +187,7 @@ func (dump *Dump) getObjects(d string, t string, start int64, count int64) ([]to
 			Where: &request.Where{
 				Field:    field.InternalObjectIdField,
 				Operator: request.BETWEEN,
-				Value:    idbutil.StringToJsonRaw(fmt.Sprintf("%v_%v", start-1, start+count)),
+				Value:    util.StringToJsonRaw(fmt.Sprintf("%v_%v", start-1, start+count)),
 			},
 		},
 	})
