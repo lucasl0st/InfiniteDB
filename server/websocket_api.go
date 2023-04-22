@@ -10,10 +10,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/lucasl0st/InfiniteDB/idblib"
-	idbutil "github.com/lucasl0st/InfiniteDB/idblib/util"
 	e "github.com/lucasl0st/InfiniteDB/models/errors"
 	"github.com/lucasl0st/InfiniteDB/models/request"
 	"github.com/lucasl0st/InfiniteDB/server/util"
+	infinitedbutil "github.com/lucasl0st/InfiniteDB/util"
 	"net/http"
 	"time"
 )
@@ -50,7 +50,7 @@ func (w *WebsocketApi) handler(c *gin.Context, rw http.ResponseWriter, r *http.R
 
 	conn.SetReadLimit(w.readLimit)
 
-	w.send(conn, 0, idbutil.InterfaceMapToJsonRawMap(gin.H{
+	w.send(conn, 0, infinitedbutil.InterfaceMapToJsonRawMap(gin.H{
 		"message":          "HELO",
 		"status":           http.StatusOK,
 		"database_version": VERSION,
@@ -60,7 +60,7 @@ func (w *WebsocketApi) handler(c *gin.Context, rw http.ResponseWriter, r *http.R
 		_, bytes, err := conn.ReadMessage()
 
 		if err != nil {
-			closed := w.send(conn, 0, idbutil.InterfaceMapToJsonRawMap(gin.H{
+			closed := w.send(conn, 0, infinitedbutil.InterfaceMapToJsonRawMap(gin.H{
 				"status":  http.StatusInternalServerError,
 				"message": "failed to read message",
 			}))
@@ -77,7 +77,7 @@ func (w *WebsocketApi) handler(c *gin.Context, rw http.ResponseWriter, r *http.R
 		}
 
 		if body != nil {
-			m := idbutil.JsonRawMapToInterfaceMap(*body)
+			m := infinitedbutil.JsonRawMapToInterfaceMap(*body)
 
 			requestId := m["requestId"]
 
@@ -86,7 +86,7 @@ func (w *WebsocketApi) handler(c *gin.Context, rw http.ResponseWriter, r *http.R
 					return
 				}
 			} else {
-				if w.send(conn, 0, idbutil.InterfaceMapToJsonRawMap(gin.H{
+				if w.send(conn, 0, infinitedbutil.InterfaceMapToJsonRawMap(gin.H{
 					"status":  http.StatusInternalServerError,
 					"message": "every request must have a requestId",
 				})) {
@@ -102,7 +102,7 @@ func (w *WebsocketApi) getBody(conn *websocket.Conn, bytes []byte) (*map[string]
 	err := json.Unmarshal(bytes, &r)
 
 	if err != nil {
-		return nil, w.send(conn, 0, idbutil.InterfaceMapToJsonRawMap(gin.H{
+		return nil, w.send(conn, 0, infinitedbutil.InterfaceMapToJsonRawMap(gin.H{
 			"status":  http.StatusInternalServerError,
 			"message": "failed to parse JSON",
 		}))
@@ -112,7 +112,7 @@ func (w *WebsocketApi) getBody(conn *websocket.Conn, bytes []byte) (*map[string]
 }
 
 func (w *WebsocketApi) send(conn *websocket.Conn, requestId int64, m map[string]json.RawMessage) bool {
-	m["requestId"] = idbutil.Int64ToJsonRaw(requestId)
+	m["requestId"] = infinitedbutil.Int64ToJsonRaw(requestId)
 
 	err := conn.WriteJSON(m)
 
@@ -170,7 +170,7 @@ func (w *WebsocketApi) methodHandler(
 		case "updateInDatabaseTable":
 			closed, status = w.updateInDatabaseTableHandler(conn, requestId, m, r)
 		default:
-			closed = w.send(conn, requestId, idbutil.InterfaceMapToJsonRawMap(gin.H{
+			closed = w.send(conn, requestId, infinitedbutil.InterfaceMapToJsonRawMap(gin.H{
 				"status":  http.StatusInternalServerError,
 				"message": "method not found",
 			}))
@@ -181,7 +181,7 @@ func (w *WebsocketApi) methodHandler(
 			w.logHandler(method.(string), status, since, clientIp, requestId)
 		}
 	} else {
-		closed = w.send(conn, requestId, idbutil.InterfaceMapToJsonRawMap(gin.H{
+		closed = w.send(conn, requestId, infinitedbutil.InterfaceMapToJsonRawMap(gin.H{
 			"status":  http.StatusInternalServerError,
 			"message": "no method specified",
 		}))
@@ -671,11 +671,11 @@ func (w *WebsocketApi) updateInDatabaseTableHandler(
 func (w *WebsocketApi) sendResults(conn *websocket.Conn, requestId int64, results *map[string]json.RawMessage, err error) (bool, int) {
 	if err == nil && results != nil {
 		r := *results
-		r["status"] = idbutil.InterfaceToJsonRaw(http.StatusOK)
+		r["status"] = infinitedbutil.InterfaceToJsonRaw(http.StatusOK)
 
 		return w.send(conn, requestId, r), http.StatusOK
 	} else {
-		return w.send(conn, requestId, idbutil.InterfaceMapToJsonRawMap(gin.H{
+		return w.send(conn, requestId, infinitedbutil.InterfaceMapToJsonRawMap(gin.H{
 			"status":  http.StatusInternalServerError,
 			"message": fmt.Sprint(err),
 		})), http.StatusInternalServerError

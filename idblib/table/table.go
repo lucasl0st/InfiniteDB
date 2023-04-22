@@ -16,6 +16,7 @@ import (
 	idbutil "github.com/lucasl0st/InfiniteDB/idblib/util"
 	e "github.com/lucasl0st/InfiniteDB/models/errors"
 	"github.com/lucasl0st/InfiniteDB/models/request"
+	"github.com/lucasl0st/InfiniteDB/util"
 	"os"
 	"regexp"
 	gsort "sort"
@@ -89,7 +90,7 @@ func (t *Table) Where(w request.Where, andObjects object.Objects) (object.Object
 
 	switch w.Operator {
 	case request.MATCH:
-		s, err := idbutil.JsonRawToString(w.Value)
+		s, err := util.JsonRawToString(w.Value)
 
 		if err != nil {
 			return nil, err
@@ -111,7 +112,7 @@ func (t *Table) Where(w request.Where, andObjects object.Objects) (object.Object
 			results = t.andMatch(andObjects, w.Field, *r)
 		}
 	case request.BETWEEN:
-		s, err := idbutil.JsonRawToString(w.Value)
+		s, err := util.JsonRawToString(w.Value)
 
 		if err != nil {
 			return nil, err

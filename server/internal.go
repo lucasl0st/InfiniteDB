@@ -10,8 +10,8 @@ import (
 	"github.com/lucasl0st/InfiniteDB/idblib"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
-	"github.com/lucasl0st/InfiniteDB/idblib/util"
 	"github.com/lucasl0st/InfiniteDB/models/request"
+	"github.com/lucasl0st/InfiniteDB/util"
 )
 
 const InternalDatabase = "internal"
