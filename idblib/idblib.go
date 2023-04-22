@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
+	"github.com/gammazero/workerpool"
 	"github.com/lucasl0st/InfiniteDB/idblib/database"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
@@ -18,6 +19,7 @@ import (
 	"github.com/lucasl0st/InfiniteDB/models/request"
 	"github.com/lucasl0st/InfiniteDB/models/response"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -31,6 +33,7 @@ type IDB struct {
 	cacheSize      uint
 	watcher        *fsnotify.Watcher
 	watchDatabases bool
+	workerPool     *workerpool.WorkerPool
 }
 
 func New(databasePath string, logger util.Logger, metricsReceiver *metrics.Receiver, cacheSize uint) (*IDB, error) {
@@ -54,6 +57,8 @@ func New(databasePath string, logger util.Logger, metricsReceiver *metrics.Recei
 		return nil, err
 	}
 
+	workers := runtime.NumCPU()
+
 	idb := &IDB{
 		databasePath:   databasePath,
 		databases:      make(map[string]*database.Database),
@@ -62,6 +67,7 @@ func New(databasePath string, logger util.Logger, metricsReceiver *metrics.Recei
 		cacheSize:      cacheSize,
 		watcher:        watcher,
 		watchDatabases: true,
+		workerPool:     workerpool.New(workers),
 	}
 
 	err = idb.loadDatabases()
@@ -340,14 +346,14 @@ func (i *IDB) GetFromDatabaseTable(name string, tableName string, request table.
 	objectsChannel := make(chan []map[string]json.RawMessage, 1)
 	errChannel := make(chan error, 1)
 
-	go func() {
+	i.workerPool.Submit(func() {
 		defer wg.Done()
 
 		objects, err := d.Get(tableName, request)
 
 		objectsChannel <- objects
 		errChannel <- err
-	}()
+	})
 
 	wg.Wait()
 
@@ -379,13 +385,13 @@ func (i *IDB) InsertToDatabaseTable(name string, tableName string, object map[st
 
 	errChannel := make(chan error, 1)
 
-	go func() {
+	i.workerPool.Submit(func() {
 		defer wg.Done()
 
 		err := d.Insert(tableName, object)
 
 		errChannel <- err
-	}()
+	})
 
 	wg.Wait()
 
@@ -415,14 +421,14 @@ func (i *IDB) RemoveFromDatabaseTable(name string, tableName string, request tab
 	countChannel := make(chan int64, 1)
 	errChannel := make(chan error, 1)
 
-	go func() {
+	i.workerPool.Submit(func() {
 		defer wg.Done()
 
 		count, err := d.Remove(tableName, request)
 
 		countChannel <- count
 		errChannel <- err
-	}()
+	})
 
 	wg.Wait()
 
@@ -451,11 +457,11 @@ func (i *IDB) UpdateInDatabaseTable(name string, tableName string, object map[st
 
 	errChannel := make(chan error, 1)
 
-	go func() {
+	i.workerPool.Submit(func() {
 		err := d.Update(tableName, object)
 
 		errChannel <- err
-	}()
+	})
 
 	wg.Wait()
 

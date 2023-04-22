@@ -4,8 +4,6 @@ go 1.20
 
 replace github.com/lucasl0st/InfiniteDB => ../../
 
-replace github.com/lucasl0st/InfiniteDB/models => ../../models
-
 replace github.com/lucasl0st/InfiniteDB/idblib => ../../idblib
 
 replace github.com/lucasl0st/InfiniteDB/tools/util => ../util
@@ -14,8 +12,7 @@ replace github.com/lucasl0st/InfiniteDB/server => ../../server
 
 require (
 	github.com/lucasl0st/InfiniteDB v0.0.0-00010101000000-000000000000
-	github.com/lucasl0st/InfiniteDB/idblib v0.0.0-00010101000000-000000000000
-	github.com/lucasl0st/InfiniteDB/models v0.0.0-00010101000000-000000000000
+	github.com/lucasl0st/InfiniteDB/idblib v0.0.0-20230420200119-e5e17987ddf0
 	github.com/lucasl0st/InfiniteDB/server v0.0.0-00010101000000-000000000000
 	github.com/lucasl0st/InfiniteDB/tools/util v0.0.0-00010101000000-000000000000
 	github.com/schollz/progressbar/v3 v3.13.1
@@ -27,6 +24,8 @@ require (
 	github.com/caarlos0/env/v6 v6.10.1 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
+	github.com/gammazero/deque v0.2.0 // indirect
+	github.com/gammazero/workerpool v1.1.3 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/gin-gonic/gin v1.9.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect

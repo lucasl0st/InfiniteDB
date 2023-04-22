@@ -2,10 +2,7 @@ module github.com/lucasl0st/InfiniteDB
 
 go 1.20
 
-replace github.com/lucasl0st/InfiniteDB/models => ./models
-
 require (
-	github.com/lucasl0st/InfiniteDB/models v0.0.0-00010101000000-000000000000
 	github.com/magefile/mage v1.14.0
 	nhooyr.io/websocket v1.8.7
 )

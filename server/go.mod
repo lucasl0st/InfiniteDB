@@ -4,8 +4,6 @@ go 1.20
 
 replace github.com/lucasl0st/InfiniteDB => ../
 
-replace github.com/lucasl0st/InfiniteDB/models => ../models
-
 replace github.com/lucasl0st/InfiniteDB/idblib => ../idblib
 
 require (
@@ -13,14 +11,16 @@ require (
 	github.com/gin-gonic/gin v1.9.0
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.5.0
-	github.com/lucasl0st/InfiniteDB/idblib v0.0.0-00010101000000-000000000000
-	github.com/lucasl0st/InfiniteDB/models v0.0.0-00010101000000-000000000000
+	github.com/lucasl0st/InfiniteDB v0.0.0-00010101000000-000000000000
+	github.com/lucasl0st/InfiniteDB/idblib v0.0.0-20230420200119-e5e17987ddf0
 )
 
 require (
 	github.com/bytedance/sonic v1.8.5 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
+	github.com/gammazero/deque v0.2.0 // indirect
+	github.com/gammazero/workerpool v1.1.3 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
@@ -29,7 +29,6 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
 	github.com/leodido/go-urn v1.2.2 // indirect
-	github.com/lucasl0st/InfiniteDB v0.0.0-00010101000000-000000000000 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
