@@ -20,6 +20,7 @@ import (
 	"regexp"
 	gsort "sort"
 	"strings"
+	"sync"
 )
 
 type Table struct {
@@ -135,7 +136,7 @@ func (t *Table) Where(w request.Where, andObjects object.Objects) (object.Object
 		larger, err := idbutil.StringToDBType(values[1], f)
 
 		if andObjects == nil {
-			results, err = t.Index.Between(w.Field, smaller, larger)
+			results = t.Index.Between(w.Field, smaller, larger)
 		} else {
 			results, err = t.andBetween(andObjects, w.Field, smaller, larger)
 		}
@@ -165,18 +166,22 @@ func (t *Table) Where(w request.Where, andObjects object.Objects) (object.Object
 			}
 		case request.SMALLER:
 			if andObjects == nil {
-				results, err = t.Index.Smaller(w.Field, v)
+				results = t.Index.Smaller(w.Field, v)
 			} else {
 				results, err = t.andSmaller(andObjects, w.Field, v)
 			}
 		case request.LARGER:
 			if andObjects == nil {
-				results, err = t.Index.Larger(w.Field, v)
+				results = t.Index.Larger(w.Field, v)
 			} else {
 				results, err = t.andLarger(andObjects, w.Field, v)
 			}
 		default:
 			return nil, e.NotAValidOperator()
+		}
+
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -485,32 +490,67 @@ func (t *Table) SkipAndLimit(objects object.Objects, skip *int64, limit *int64) 
 }
 
 func (t *Table) isUnique(o *object.Object) error {
+	errs := make(chan error, len(t.Config.Fields))
+	var wg sync.WaitGroup
+
 	for fieldName, f := range t.Config.Fields {
 		if f.Unique && f.Name != field.InternalObjectIdField {
-			if len(t.Index.Equal(fieldName, o.M[fieldName])) > 0 {
-				return e.FoundExistingObjectWithField(fieldName)
-			}
+			wg.Add(1)
+
+			go func(fieldName string) {
+				if len(t.Index.Equal(fieldName, o.M[fieldName])) > 0 {
+					errs <- e.FoundExistingObjectWithField(fieldName)
+				}
+
+				wg.Done()
+			}(fieldName)
+		}
+	}
+
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		if err != nil {
+			return err
 		}
 	}
 
 	for _, fieldNames := range t.Config.Options.CombinedUniques {
 		var first = true
-		var objects object.Objects
+		firstObjects := make(chan object.Objects, 1)
+		objects := make(chan object.Objects, len(fieldNames))
 
 		for _, fieldName := range fieldNames {
-			if first {
-				objects = t.Index.Equal(fieldName, o.M[fieldName])
-				first = false
-			} else {
-				objects = t.and(objects, t.Index.Equal(fieldName, o.M[fieldName]))
+			wg.Add(1)
 
-				if len(objects) == 0 {
-					break
+			go func(fieldName string, first bool) {
+				if first {
+					firstObjects <- t.Index.Equal(fieldName, o.M[fieldName])
+				} else {
+					objects <- t.Index.Equal(fieldName, o.M[fieldName])
 				}
+
+				wg.Done()
+			}(fieldName, first)
+
+			if first {
+				first = false
 			}
 		}
 
-		if len(objects) != 0 {
+		wg.Wait()
+
+		close(firstObjects)
+		close(objects)
+
+		existingObjects := <-firstObjects
+
+		for objects := range objects {
+			existingObjects = t.and(existingObjects, objects)
+		}
+
+		if len(existingObjects) != 0 {
 			return e.FoundExistingObjectWithCombinedUniques()
 		}
 	}
