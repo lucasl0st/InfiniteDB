@@ -141,24 +141,18 @@ func (t *Table) unIndex(object object.Object) {
 
 			go func(fieldName string) {
 				i := t.GetIndex(fieldName)
-				i.Remove(object.M[fieldName], object.Id)
+				i.Remove(object.Id)
 
 				wg.Done()
 			}(f.Name)
 		}
 	}
 
-	n, err := dbtype.NumberFromInt64(object.Id)
-
-	if err != nil {
-		panic(err.Error())
-	}
-
 	wg.Add(1)
 
 	go func() {
 		i := t.GetIndex(field.InternalObjectIdField)
-		i.Remove(n, object.Id)
+		i.Remove(object.Id)
 
 		wg.Done()
 	}()
