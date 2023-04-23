@@ -36,12 +36,12 @@ func BoolFromNull() Bool {
 func (a Bool) Larger(b DBType) bool {
 	bb := b.(Bool)
 
-	return a.b && !(a.null || bb.null)
+	return (a.b && !bb.b) && !(a.null || bb.null)
 }
 
 func (a Bool) Smaller(b DBType) bool {
 	bb := b.(Bool)
-	return !a.b && !(a.null || bb.null)
+	return (!a.b && bb.b) && !(a.null || bb.null)
 }
 
 func (a Bool) Equal(b DBType) bool {

@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gammazero/workerpool"
 	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
@@ -27,13 +26,14 @@ import (
 )
 
 type Table struct {
-	DatabaseName string
-	Name         string
-	path         string
-	Config       field.TableConfig
-	Index        *field.Index
-	Storage      *storage.Storage
-	workerPool   *workerpool.WorkerPool
+	DatabaseName   string
+	Name           string
+	path           string
+	Config         field.TableConfig
+	Index          *field.Index
+	Storage        *storage.Storage
+	runningThreads int
+	wg             sync.WaitGroup
 }
 
 func NewTable(
@@ -45,15 +45,13 @@ func NewTable(
 	metrics *metrics.Metrics,
 	cacheSize uint,
 ) (*Table, error) {
-	workers := runtime.NumCPU()
-
 	table := Table{
-		DatabaseName: databaseName,
-		Name:         name,
-		path:         path,
-		Config:       config,
-		Index:        field.NewIndex(config.Fields),
-		workerPool:   workerpool.New(workers),
+		DatabaseName:   databaseName,
+		Name:           name,
+		path:           path,
+		Config:         config,
+		Index:          field.NewIndex(config.Fields),
+		runningThreads: 0,
 	}
 
 	s, err := storage.NewStorage(path+name+"/", table.addedObject, table.deletedObject, logger, metrics, cacheSize, config.Fields)
@@ -82,15 +80,21 @@ func (t *Table) Delete() error {
 }
 
 func (t *Table) addedObject(object object.Object) {
-	t.workerPool.Submit(func() {
-		t.Index.Index(object)
-	})
+	if t.runningThreads > runtime.NumCPU() {
+		t.wg.Wait()
+		t.runningThreads = 0
+	}
+
+	t.wg.Add(1)
+
+	go func() {
+		t.Index.UpdateIndex(object)
+		t.wg.Done()
+	}()
 }
 
 func (t *Table) deletedObject(object object.Object) {
-	t.workerPool.Submit(func() {
-		t.Index.UnIndex(object)
-	})
+	t.Index.UnIndex(object)
 }
 
 func (t *Table) Where(w request.Where, andObjects object.Objects) (object.Objects, error) {
@@ -336,11 +340,8 @@ func (t *Table) Insert(objectM map[string]json.RawMessage) error {
 		return err
 	}
 
+	t.Index.Index(*o)
 	t.Storage.AddObject(*o)
-
-	if err != nil {
-		return err
-	}
 
 	return nil
 }
