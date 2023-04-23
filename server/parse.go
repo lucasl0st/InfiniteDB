@@ -6,6 +6,7 @@ package server
 
 import (
 	"encoding/json"
+	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/functions"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
@@ -117,12 +118,12 @@ func parseFields(fields map[string]request.Field) (map[string]field.Field, error
 	resultMap := make(map[string]field.Field)
 
 	for fieldName, f := range fields {
-		var t *field.DatabaseType
+		var t *dbtype.DatabaseType
 		indexed := false
 		unique := false
 		null := false
 
-		t = field.ParseDatabaseType(f.Type)
+		t = dbtype.ParseDatabaseType(f.Type)
 
 		if t == nil {
 			return nil, e.TypeNotSupported(f.Type)

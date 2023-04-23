@@ -10,7 +10,7 @@ import (
 
 func JsonRawToDBType(j json.RawMessage, f field.Field) (dbtype.DBType, error) {
 	switch f.Type {
-	case field.TEXT:
+	case dbtype.TEXT:
 		s, err := util.JsonRawToString(j)
 
 		if err != nil {
@@ -22,7 +22,7 @@ func JsonRawToDBType(j json.RawMessage, f field.Field) (dbtype.DBType, error) {
 		}
 
 		return dbtype.TextFromString(*s), nil
-	case field.NUMBER:
+	case dbtype.NUMBER:
 		s, err := util.JsonRawToStringNumber(j)
 
 		if err != nil {
@@ -34,7 +34,7 @@ func JsonRawToDBType(j json.RawMessage, f field.Field) (dbtype.DBType, error) {
 		}
 
 		return dbtype.NumberFromString(*s)
-	case field.BOOL:
+	case dbtype.BOOL:
 		s, err := util.JsonRawToStringBool(j)
 
 		if err != nil {
@@ -53,11 +53,11 @@ func JsonRawToDBType(j json.RawMessage, f field.Field) (dbtype.DBType, error) {
 
 func StringToDBType(s string, f field.Field) (dbtype.DBType, error) {
 	switch f.Type {
-	case field.TEXT:
+	case dbtype.TEXT:
 		return dbtype.TextFromString(s), nil
-	case field.NUMBER:
+	case dbtype.NUMBER:
 		return dbtype.NumberFromString(s)
-	case field.BOOL:
+	case dbtype.BOOL:
 		return dbtype.BoolFromString(s), nil
 	}
 

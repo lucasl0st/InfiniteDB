@@ -2,7 +2,7 @@
  * Copyright (c) 2023 Lucas Pape
  */
 
-package field
+package dbtype
 
 type DatabaseType string
 
@@ -18,6 +18,12 @@ var databaseTypesMap = map[string]DatabaseType{
 	"text":   TEXT,
 }
 
+var stringToDatabaseTypesMap = map[DatabaseType]string{
+	BOOL:   "bool",
+	NUMBER: "number",
+	TEXT:   "text",
+}
+
 func ParseDatabaseType(s string) *DatabaseType {
 	t, ok := databaseTypesMap[s]
 
@@ -26,4 +32,8 @@ func ParseDatabaseType(s string) *DatabaseType {
 	}
 
 	return &t
+}
+
+func DatabaseTypeToString(t DatabaseType) string {
+	return stringToDatabaseTypesMap[t]
 }
