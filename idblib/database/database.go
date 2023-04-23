@@ -278,6 +278,10 @@ func (d *Database) Get(tableName string, request table.Request) ([]map[string]js
 			objects, err = t.Sort(objects, request.Sort.Field, additionalFields, request.Sort.Direction)
 		}
 
+		if err != nil {
+			return nil, err
+		}
+
 		objects = t.SkipAndLimit(objects, request.Skip, request.Limit)
 
 		results := t.Storage.GetObjects(objects)
