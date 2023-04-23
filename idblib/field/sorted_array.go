@@ -7,36 +7,26 @@ package field
 import (
 	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"sort"
-	"sync"
 )
 
 type SortedArray struct {
-	a         []int64
-	fieldName string
-	sync.RWMutex
-	getValueForObjectId func(fieldName string, id int64) dbtype.DBType
+	a                   []int64
+	getValueForObjectId func(id int64) dbtype.DBType
 }
 
-func NewSortedArray(fieldName string, getValueForObjectId func(fieldName string, id int64) dbtype.DBType) *SortedArray {
+func NewSortedArray(getValueForObjectId func(id int64) dbtype.DBType) *SortedArray {
 	return &SortedArray{
-		fieldName:           fieldName,
 		getValueForObjectId: getValueForObjectId,
 	}
 }
 
 func (a *SortedArray) Insert(value dbtype.DBType, objectId int64) {
 	if len(a.a) == 0 {
-		a.Lock()
-		defer a.Unlock()
-
 		a.a = append(a.a, objectId)
 		return
 	}
 
 	i := a.FindStartIndex(value)
-
-	a.Lock()
-	defer a.Unlock()
 
 	a.a = append(a.a, 0)
 	copy(a.a[i+1:], a.a[i:])
@@ -44,9 +34,6 @@ func (a *SortedArray) Insert(value dbtype.DBType, objectId int64) {
 }
 
 func (a *SortedArray) Get(i int) *int64 {
-	a.RLock()
-	defer a.RUnlock()
-
 	if i >= a.Length() {
 		return nil
 	}
@@ -60,9 +47,6 @@ func (a *SortedArray) Length() int {
 
 func (a *SortedArray) Remove(value dbtype.DBType, objectId int64) {
 	start := a.FindStartIndex(value)
-
-	a.Lock()
-	defer a.Unlock()
 
 	index := -1
 
@@ -81,11 +65,8 @@ func (a *SortedArray) Remove(value dbtype.DBType, objectId int64) {
 }
 
 func (a *SortedArray) FindStartIndex(value dbtype.DBType) int {
-	a.RLock()
-	defer a.RUnlock()
-
 	return sort.Search(len(a.a), func(i int) bool {
-		return a.getValueForObjectId(a.fieldName, a.a[i]).Larger(value)
+		return a.getValueForObjectId(a.a[i]).Larger(value)
 	})
 }
 
@@ -93,7 +74,7 @@ func (a *SortedArray) FindEndIndex(value dbtype.DBType, start int) int {
 	end := start
 
 	for end < len(a.a) {
-		if a.getValueForObjectId(a.fieldName, a.a[end]).Equal(value) {
+		if a.getValueForObjectId(a.a[end]).Equal(value) {
 			end++
 		} else {
 			break

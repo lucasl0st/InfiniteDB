@@ -46,13 +46,13 @@ func (d *DistanceFunction) Run(
 		if additionalFields[o][d.latitudeFrom] != nil {
 			fromLatitudeValue = additionalFields[o][d.latitudeFrom].(dbtype.Number)
 		} else {
-			fromLatitudeValue = table.Index.GetValue(d.latitudeFrom, o).(dbtype.Number)
+			fromLatitudeValue = table.GetIndex(d.latitudeFrom).GetValue(o).(dbtype.Number)
 		}
 
 		if additionalFields[o][d.longitudeFrom] != nil {
 			fromLongitudeValue = additionalFields[o][d.longitudeFrom].(dbtype.Number)
 		} else {
-			fromLongitudeValue = table.Index.GetValue(d.longitudeFrom, o).(dbtype.Number)
+			fromLongitudeValue = table.GetIndex(d.longitudeFrom).GetValue(o).(dbtype.Number)
 		}
 
 		if additionalFields[o] == nil {

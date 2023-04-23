@@ -41,7 +41,7 @@ func (m *MinMaxFunction) Run(
 		if additionalFields[o][m.fieldName] != nil {
 			v = additionalFields[o][m.fieldName]
 		} else {
-			v = t.Index.GetValue(m.fieldName, o)
+			v = t.GetIndex(m.fieldName).GetValue(o)
 		}
 
 		if r == nil {
