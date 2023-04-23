@@ -40,7 +40,13 @@ func (l *LevenshteinFunction) Run(
 		if additionalFields[o][l.fieldName] != nil {
 			str2 = additionalFields[o][l.fieldName].(dbtype.Text)
 		} else {
-			str2 = table.GetIndex(l.fieldName).GetValue(o).(dbtype.Text)
+			index, err := table.GetIndex(l.fieldName)
+
+			if err != nil {
+				return nil, nil, err
+			}
+
+			str2 = index.GetValue(o).(dbtype.Text)
 		}
 
 		if additionalFields[o] == nil {
