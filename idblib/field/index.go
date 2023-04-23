@@ -17,51 +17,48 @@ type Index struct {
 	fields     map[string]Field
 	fieldsLock sync.RWMutex
 
-	valueIndex int64
+	// fieldName -> objectId -> value
+	values     map[string]map[int64]dbtype.DBType
 	valuesLock sync.RWMutex
 
-	// valueIndex -> value
-	values map[int64]dbtype.DBType
-
-	// valueIndex -> objectIds
-	valueIndexToObjectIds     map[int64][]int64
-	valueIndexToObjectIdsLock sync.RWMutex
-
-	// fieldName -> sorted values index
-	sortedValues     map[string][]int64
+	//fieldName -> sorted values
+	sortedValues     map[string]*SortedArray
 	sortedValuesLock sync.RWMutex
-
-	// fieldName -> objectId -> values index
-	objectIds     map[string]map[int64]int64
-	objectIdsLock sync.RWMutex
 }
 
 func NewIndex(fields map[string]Field) *Index {
 	index := &Index{
-		fields:                fields,
-		valueIndex:            0,
-		values:                map[int64]dbtype.DBType{},
-		valueIndexToObjectIds: map[int64][]int64{},
-		sortedValues:          map[string][]int64{},
-		objectIds:             map[string]map[int64]int64{},
+		fields:       fields,
+		values:       map[string]map[int64]dbtype.DBType{},
+		sortedValues: map[string]*SortedArray{},
 	}
 
 	for _, field := range fields {
-		index.objectIds[field.Name] = map[int64]int64{}
+		index.values[field.Name] = map[int64]dbtype.DBType{}
+
+		index.sortedValues[field.Name] = NewSortedArray(field.Name, index.getValue)
 	}
 
-	index.objectIds[InternalObjectIdField] = map[int64]int64{}
+	index.values[InternalObjectIdField] = map[int64]dbtype.DBType{}
+	index.sortedValues[InternalObjectIdField] = NewSortedArray(InternalObjectIdField, index.getValue)
 
 	return index
 }
 
 func (i *Index) Index(o object.Object) {
-	i.fieldsLock.Lock()
-	defer i.fieldsLock.Unlock()
+	i.fieldsLock.RLock()
+	defer i.fieldsLock.RUnlock()
+
+	var wg sync.WaitGroup
 
 	for fieldName, field := range i.fields {
 		if field.Indexed && field.Name != InternalObjectIdField {
-			i.add(fieldName, o.M[fieldName], o.Id)
+			wg.Add(1)
+
+			go func(fieldName string) {
+				i.add(fieldName, o.M[fieldName], o.Id)
+				wg.Done()
+			}(fieldName)
 		}
 	}
 
@@ -71,17 +68,47 @@ func (i *Index) Index(o object.Object) {
 		panic(err.Error())
 	}
 
-	i.add(InternalObjectIdField, n, o.Id)
+	wg.Add(1)
+
+	go func() {
+		i.add(InternalObjectIdField, n, o.Id)
+		wg.Done()
+	}()
+
+	wg.Wait()
 }
 
 func (i *Index) UnIndex(o object.Object) {
+	i.fieldsLock.RLock()
+	defer i.fieldsLock.RUnlock()
+
+	var wg sync.WaitGroup
+
 	for fieldName, field := range i.fields {
 		if field.Indexed && field.Name != InternalObjectIdField {
-			i.remove(fieldName, o.Id)
+			wg.Add(1)
+
+			go func(fieldName string) {
+				i.remove(fieldName, o.M[fieldName], o.Id)
+				wg.Done()
+			}(fieldName)
 		}
 	}
 
-	i.remove(InternalObjectIdField, o.Id)
+	n, err := dbtype.NumberFromInt64(o.Id)
+
+	if err != nil {
+		panic(err.Error())
+	}
+
+	wg.Add(1)
+
+	go func() {
+		i.remove(InternalObjectIdField, n, o.Id)
+		wg.Done()
+	}()
+
+	wg.Wait()
 }
 
 func (i *Index) UpdateIndex(o object.Object) {
@@ -90,155 +117,59 @@ func (i *Index) UpdateIndex(o object.Object) {
 }
 
 func (i *Index) add(field string, value dbtype.DBType, id int64) {
-	i.objectIdsLock.Lock()
-	defer i.objectIdsLock.Unlock()
-
-	i.valuesLock.Lock()
-	defer i.valuesLock.Unlock()
-
-	i.valueIndex++
-	index := i.valueIndex
-
-	i.values[index] = value
-
-	i.insertSorted(field, value, index)
-
-	i.valueIndexToObjectIdsLock.Lock()
-	defer i.valueIndexToObjectIdsLock.Unlock()
-
-	i.valueIndexToObjectIds[index] = append(i.valueIndexToObjectIds[index], id)
-	i.objectIds[field][id] = index
-}
-
-func (i *Index) insertSorted(field string, value dbtype.DBType, valueIndex int64) {
-	arr := i.sortedValues[field]
-
-	if len(arr) == 0 {
-		i.sortedValues[field] = append(arr, valueIndex)
-		return
-	}
-
-	ind := i.findIndex(arr, value)
-
-	arr = append(arr, 0)
-	copy(arr[ind+1:], arr[ind:])
-	arr[ind] = valueIndex
-
-	i.sortedValues[field] = arr
-}
-
-func (i *Index) findIndex(arr []int64, value dbtype.DBType) int {
-	left := 0
-	right := len(arr) - 1
-
-	for left <= right {
-		mid := (left + right) / 2
-		midValue := i.values[arr[mid]]
-
-		if value.Equal(midValue) {
-			return mid
-		} else if value.Smaller(midValue) {
-			right = mid - 1
-		} else {
-			left = mid + 1
-		}
-	}
-
-	return left
-}
-
-func (i *Index) remove(field string, id int64) {
-	i.objectIdsLock.Lock()
-	defer i.objectIdsLock.Unlock()
-
 	i.sortedValuesLock.Lock()
 	defer i.sortedValuesLock.Unlock()
 
-	i.valueIndexToObjectIdsLock.Lock()
-	defer i.valueIndexToObjectIdsLock.Unlock()
+	i.valuesLock.Lock()
+	defer i.valuesLock.Unlock()
+
+	i.sortedValues[field].Insert(value, id)
+	i.values[field][id] = value
+}
+
+func (i *Index) remove(field string, value dbtype.DBType, id int64) {
+	i.sortedValuesLock.Lock()
+	defer i.sortedValuesLock.Unlock()
 
 	i.valuesLock.Lock()
 	defer i.valuesLock.Unlock()
 
-	valueIndex := i.objectIds[field][id]
+	i.sortedValues[field].Remove(value, id)
 
-	delete(i.objectIds[field], id)
-
-	copy(i.sortedValues[field][valueIndex:], i.sortedValues[field][valueIndex+1:])
-	i.sortedValues[field] = i.sortedValues[field][:len(i.sortedValues)-1]
-
-	delete(i.valueIndexToObjectIds, valueIndex)
-
-	delete(i.values, valueIndex)
+	//TODO deleting this is bugged. It does not have any negative effect besides using memory so just leaving this for later
+	//delete(i.values[field], id)
 }
 
 func (i *Index) GetValue(field string, id int64) dbtype.DBType {
-	i.objectIdsLock.RLock()
-	defer i.objectIdsLock.RUnlock()
-
 	i.valuesLock.RLock()
 	defer i.valuesLock.RUnlock()
 
-	return i.values[i.objectIds[field][id]]
+	return i.getValue(field, id)
 }
 
-func (i *Index) getObjectIds(valueIndex int64) []int64 {
-	i.valueIndexToObjectIdsLock.RLock()
-	defer i.valueIndexToObjectIdsLock.RUnlock()
-
-	return i.valueIndexToObjectIds[valueIndex]
-}
-
-func (i *Index) getStartAndEndIndexes(field string, value dbtype.DBType) (int, int) {
-	index := i.findIndex(i.sortedValues[field], value)
-
-	if index >= len(i.sortedValues[field]) {
-		return index, index
-	}
-
-	start := index
-	end := index
-
-	for start > 0 {
-		if i.values[i.sortedValues[field][start]].Equal(value) {
-			start--
-		} else {
-			break
-		}
-	}
-
-	for end < len(i.sortedValues[field])-1 {
-		if i.values[i.sortedValues[field][end]].Equal(value) {
-			end++
-		} else {
-			break
-		}
-	}
-
-	return start, end
+func (i *Index) getValue(field string, id int64) dbtype.DBType {
+	return i.values[field][id]
 }
 
 func (i *Index) Equal(field string, value dbtype.DBType) []int64 {
 	i.sortedValuesLock.RLock()
 	defer i.sortedValuesLock.RUnlock()
 
-	i.valuesLock.RLock()
-	defer i.valuesLock.RUnlock()
-
-	if len(i.sortedValues[field]) == 0 {
-		return nil
-	}
-
-	start, end := i.getStartAndEndIndexes(field, value)
-
-	if start >= len(i.sortedValues[field]) {
-		return nil
-	}
+	start := i.sortedValues[field].FindStartIndex(value)
+	end := i.sortedValues[field].FindEndIndex(value, start)
 
 	var results []int64
 
 	for k := start; k <= end; k++ {
-		results = append(results, i.getObjectIds(i.sortedValues[field][k])...)
+		id := i.sortedValues[field].Get(k)
+
+		if id == nil {
+			return results
+		}
+
+		if i.GetValue(field, *id).Equal(value) {
+			results = append(results, *id)
+		}
 	}
 
 	return results
@@ -248,23 +179,21 @@ func (i *Index) Not(field string, value dbtype.DBType) []int64 {
 	i.sortedValuesLock.RLock()
 	defer i.sortedValuesLock.RUnlock()
 
-	i.valuesLock.RLock()
-	defer i.valuesLock.RUnlock()
-
-	if len(i.sortedValues[field]) == 0 {
-		return nil
-	}
-
-	start, end := i.getStartAndEndIndexes(field, value)
+	start := i.sortedValues[field].FindStartIndex(value)
+	end := i.sortedValues[field].FindEndIndex(value, start)
 
 	var results []int64
 
-	for k := range i.sortedValues[field] {
+	for k := 0; k < i.sortedValues[field].Length(); k++ {
 		if k > start && k < end {
 			continue
 		}
 
-		results = append(results, i.getObjectIds(i.sortedValues[field][k])...)
+		id := i.sortedValues[field].Get(k)
+
+		if i.GetValue(field, *id).Not(value) {
+			results = append(results, *id)
+		}
 	}
 
 	return results
@@ -277,15 +206,13 @@ func (i *Index) Match(field string, r regexp.Regexp) []int64 {
 	i.valuesLock.RLock()
 	defer i.valuesLock.RUnlock()
 
-	if len(i.sortedValues[field]) == 0 {
-		return nil
-	}
-
 	var results []int64
 
-	for k := range i.sortedValues[field] {
-		if i.values[i.sortedValues[field][k]].Matches(r) {
-			results = append(results, i.getObjectIds(i.sortedValues[field][k])...)
+	for k := 0; k < i.sortedValues[field].Length(); k++ {
+		id := *i.sortedValues[field].Get(k)
+
+		if i.values[field][id].Matches(r) {
+			results = append(results, id)
 		}
 	}
 
@@ -296,23 +223,12 @@ func (i *Index) Larger(field string, value dbtype.DBType) []int64 {
 	i.sortedValuesLock.RLock()
 	defer i.sortedValuesLock.RUnlock()
 
-	i.valuesLock.RLock()
-	defer i.valuesLock.RUnlock()
-
-	if len(i.sortedValues[field]) == 0 {
-		return nil
-	}
-
-	start, _ := i.getStartAndEndIndexes(field, value)
-
-	if start >= len(i.sortedValues[field]) {
-		return nil
-	}
+	start := i.sortedValues[field].FindStartIndex(value)
 
 	var results []int64
 
-	for k := start; k < len(i.sortedValues); k++ {
-		results = append(results, i.getObjectIds(i.sortedValues[field][k])...)
+	for k := start; k < i.sortedValues[field].Length(); k++ {
+		results = append(results, *i.sortedValues[field].Get(k))
 	}
 
 	return results
@@ -322,19 +238,19 @@ func (i *Index) Smaller(field string, value dbtype.DBType) []int64 {
 	i.sortedValuesLock.RLock()
 	defer i.sortedValuesLock.RUnlock()
 
-	i.valuesLock.RLock()
-	defer i.valuesLock.RUnlock()
-
-	if len(i.sortedValues[field]) == 0 {
-		return nil
-	}
-
-	_, end := i.getStartAndEndIndexes(field, value)
+	start := i.sortedValues[field].FindStartIndex(value)
+	end := i.sortedValues[field].FindEndIndex(value, start)
 
 	var results []int64
 
 	for k := end; k >= 0; k-- {
-		results = append(results, i.getObjectIds(i.sortedValues[field][k])...)
+		id := i.sortedValues[field].Get(k)
+
+		if id == nil {
+			continue
+		}
+
+		results = append(results, *id)
 	}
 
 	return results
@@ -344,20 +260,20 @@ func (i *Index) Between(field string, smaller dbtype.DBType, larger dbtype.DBTyp
 	i.sortedValuesLock.RLock()
 	defer i.sortedValuesLock.RUnlock()
 
-	i.valuesLock.RLock()
-	defer i.valuesLock.RUnlock()
-
-	if len(i.sortedValues[field]) == 0 {
-		return nil
-	}
-
-	start, _ := i.getStartAndEndIndexes(field, smaller)
-	_, end := i.getStartAndEndIndexes(field, larger)
+	start := i.sortedValues[field].FindStartIndex(smaller)
+	startLarger := i.sortedValues[field].FindStartIndex(larger)
+	end := i.sortedValues[field].FindEndIndex(larger, startLarger)
 
 	var results []int64
 
 	for k := start; k <= end; k++ {
-		results = append(results, i.getObjectIds(i.sortedValues[field][k])...)
+		id := i.sortedValues[field].Get(k)
+
+		if id == nil {
+			return results
+		}
+
+		results = append(results, *id)
 	}
 
 	return results
