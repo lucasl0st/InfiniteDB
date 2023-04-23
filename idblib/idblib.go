@@ -11,6 +11,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/gammazero/workerpool"
 	"github.com/lucasl0st/InfiniteDB/idblib/database"
+	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
@@ -287,19 +288,8 @@ func (i *IDB) CreateTableInDatabase(name string, tableName string, fields map[st
 	f := map[string]request.Field{}
 
 	for fieldName, ff := range fields {
-		t := ""
-
-		switch ff.Type {
-		case field.TEXT:
-			t = "text"
-		case field.NUMBER:
-			t = "number"
-		case field.BOOL:
-			t = "boolean"
-		}
-
 		f[fieldName] = request.Field{
-			Type:    t,
+			Type:    dbtype.DatabaseTypeToString(ff.Type),
 			Indexed: &ff.Indexed,
 			Unique:  &ff.Unique,
 			Null:    &ff.Null,

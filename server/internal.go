@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"github.com/google/uuid"
 	"github.com/lucasl0st/InfiniteDB/idblib"
+	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
 	"github.com/lucasl0st/InfiniteDB/models/request"
@@ -40,14 +41,14 @@ func SetupAuthenticationTable(idb *idblib.IDB) error {
 		Name:    AuthenticationTableFieldKeyId,
 		Indexed: true,
 		Unique:  true,
-		Type:    field.TEXT,
+		Type:    dbtype.TEXT,
 	}
 
 	fields[AuthenticationTableFieldKeyValue] = field.Field{
 		Name:    AuthenticationTableFieldKeyValue,
 		Indexed: true,
 		Unique:  false,
-		Type:    field.TEXT,
+		Type:    dbtype.TEXT,
 	}
 
 	_, err = idb.CreateTableInDatabase(InternalDatabase, AuthenticationTable, fields, request.TableOptions{})

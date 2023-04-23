@@ -19,21 +19,18 @@ import (
 	"github.com/lucasl0st/InfiniteDB/util"
 	"os"
 	"regexp"
-	"runtime"
 	gsort "sort"
 	"strings"
 	"sync"
 )
 
 type Table struct {
-	DatabaseName   string
-	Name           string
-	path           string
-	Config         field.TableConfig
-	Index          *field.Index
-	Storage        *storage.Storage
-	runningThreads int
-	wg             sync.WaitGroup
+	DatabaseName string
+	Name         string
+	path         string
+	Config       field.TableConfig
+	Index        *field.Index
+	Storage      *storage.Storage
 }
 
 func NewTable(
@@ -46,12 +43,11 @@ func NewTable(
 	cacheSize uint,
 ) (*Table, error) {
 	table := Table{
-		DatabaseName:   databaseName,
-		Name:           name,
-		path:           path,
-		Config:         config,
-		Index:          field.NewIndex(config.Fields),
-		runningThreads: 0,
+		DatabaseName: databaseName,
+		Name:         name,
+		path:         path,
+		Config:       config,
+		Index:        field.NewIndex(config.Fields),
 	}
 
 	s, err := storage.NewStorage(path+name+"/", table.addedObject, table.deletedObject, logger, metrics, cacheSize, config.Fields)
@@ -67,7 +63,7 @@ func NewTable(
 		Indexed: true,
 		Unique:  true,
 		Null:    false,
-		Type:    field.NUMBER,
+		Type:    dbtype.NUMBER,
 	}
 
 	return &table, err
@@ -80,17 +76,7 @@ func (t *Table) Delete() error {
 }
 
 func (t *Table) addedObject(object object.Object) {
-	if t.runningThreads > runtime.NumCPU() {
-		t.wg.Wait()
-		t.runningThreads = 0
-	}
-
-	t.wg.Add(1)
-
-	go func() {
-		t.Index.UpdateIndex(object)
-		t.wg.Done()
-	}()
+	t.Index.UpdateIndex(object)
 }
 
 func (t *Table) deletedObject(object object.Object) {
