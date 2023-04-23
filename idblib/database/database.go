@@ -270,6 +270,10 @@ func (d *Database) Get(tableName string, request table.Request) ([]map[string]js
 
 		objects, additionalFields, err := t.Query(*request.Query, nil, make(table.AdditionalFields))
 
+		if err != nil {
+			return nil, err
+		}
+
 		if request.Sort != nil {
 			objects, err = t.Sort(objects, request.Sort.Field, additionalFields, request.Sort.Direction)
 		}
