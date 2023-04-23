@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gammazero/workerpool"
 	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
@@ -19,6 +20,7 @@ import (
 	"github.com/lucasl0st/InfiniteDB/util"
 	"os"
 	"regexp"
+	"runtime"
 	gsort "sort"
 	"strings"
 	"sync"
@@ -31,6 +33,7 @@ type Table struct {
 	Config       field.TableConfig
 	Index        *field.Index
 	Storage      *storage.Storage
+	workerPool   *workerpool.WorkerPool
 }
 
 func NewTable(
@@ -42,12 +45,15 @@ func NewTable(
 	metrics *metrics.Metrics,
 	cacheSize uint,
 ) (*Table, error) {
+	workers := runtime.NumCPU()
+
 	table := Table{
 		DatabaseName: databaseName,
 		Name:         name,
 		path:         path,
 		Config:       config,
 		Index:        field.NewIndex(config.Fields),
+		workerPool:   workerpool.New(workers),
 	}
 
 	s, err := storage.NewStorage(path+name+"/", table.addedObject, table.deletedObject, logger, metrics, cacheSize, config.Fields)
@@ -76,11 +82,15 @@ func (t *Table) Delete() error {
 }
 
 func (t *Table) addedObject(object object.Object) {
-	t.Index.Index(object)
+	t.workerPool.Submit(func() {
+		t.Index.Index(object)
+	})
 }
 
 func (t *Table) deletedObject(object object.Object) {
-	t.Index.UnIndex(object)
+	t.workerPool.Submit(func() {
+		t.Index.UnIndex(object)
+	})
 }
 
 func (t *Table) Where(w request.Where, andObjects object.Objects) (object.Objects, error) {
