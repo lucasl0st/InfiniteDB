@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
+	"github.com/lucasl0st/InfiniteDB/idblib/index"
 	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
 	"github.com/lucasl0st/InfiniteDB/idblib/object"
 	"github.com/lucasl0st/InfiniteDB/idblib/storage"
@@ -19,7 +20,7 @@ import (
 	"github.com/lucasl0st/InfiniteDB/util"
 	"os"
 	"regexp"
-	gsort "sort"
+	"sort"
 	"strings"
 )
 
@@ -30,7 +31,7 @@ type Table struct {
 	Config       field.TableConfig
 
 	//fieldName -> index
-	indexes map[string]*field.Index
+	indexes map[string]*index.Index
 
 	Storage *storage.Storage
 }
@@ -49,16 +50,16 @@ func NewTable(
 		Name:         name,
 		path:         path,
 		Config:       config,
-		indexes:      map[string]*field.Index{},
+		indexes:      map[string]*index.Index{},
 	}
 
 	for _, f := range config.Fields {
 		if f.Indexed {
-			table.indexes[f.Name] = field.NewIndex()
+			table.indexes[f.Name] = index.NewIndex()
 		}
 	}
 
-	table.indexes[field.InternalObjectIdField] = field.NewIndex()
+	table.indexes[field.InternalObjectIdField] = index.NewIndex()
 
 	s, err := storage.NewStorage(path+name+"/", table.addedObject, table.deletedObject, logger, metrics, cacheSize, config.Fields)
 
@@ -93,7 +94,7 @@ func (t *Table) deletedObject(object object.Object) {
 	t.unIndex(object)
 }
 
-func (t *Table) GetIndex(fieldName string) (*field.Index, error) {
+func (t *Table) GetIndex(fieldName string) (*index.Index, error) {
 	i, ok := t.indexes[fieldName]
 
 	if !ok {
@@ -140,7 +141,7 @@ func (t *Table) unIndex(object object.Object) {
 				panic(err.Error())
 			}
 
-			i.Remove(object.Id)
+			i.Remove(object.M[f.Name], object.Id)
 		}
 	}
 
@@ -150,7 +151,13 @@ func (t *Table) unIndex(object object.Object) {
 		panic(err.Error())
 	}
 
-	i.Remove(object.Id)
+	n, err := dbtype.NumberFromInt64(object.Id)
+
+	if err != nil {
+		panic(err.Error())
+	}
+
+	i.Remove(n, object.Id)
 }
 
 func (t *Table) updateIndex(object object.Object) {
@@ -161,7 +168,7 @@ func (t *Table) updateIndex(object object.Object) {
 func (t *Table) Where(w request.Where, andObjects object.Objects) (object.Objects, error) {
 	f := t.Config.Fields[w.Field]
 
-	index, err := t.GetIndex(w.Field)
+	i, err := t.GetIndex(w.Field)
 
 	if err != nil {
 		return nil, err
@@ -188,7 +195,7 @@ func (t *Table) Where(w request.Where, andObjects object.Objects) (object.Object
 		}
 
 		if andObjects == nil {
-			results = index.Match(*r)
+			results = i.Match(*r)
 		} else {
 			results, err = t.andMatch(andObjects, w.Field, *r)
 		}
@@ -218,7 +225,7 @@ func (t *Table) Where(w request.Where, andObjects object.Objects) (object.Object
 		larger, err := idbutil.StringToDBType(values[1], f)
 
 		if andObjects == nil {
-			results = index.Between(smaller, larger)
+			results = i.Between(smaller, larger)
 		} else {
 			results, err = t.andBetween(andObjects, w.Field, smaller, larger)
 		}
@@ -236,25 +243,25 @@ func (t *Table) Where(w request.Where, andObjects object.Objects) (object.Object
 		switch w.Operator {
 		case request.EQUALS:
 			if andObjects == nil {
-				results = index.Equal(v)
+				results = i.Equal(v)
 			} else {
 				results, err = t.andEqual(andObjects, w.Field, v)
 			}
 		case request.NOT:
 			if andObjects == nil {
-				results = index.Not(v)
+				results = i.Not(v)
 			} else {
 				results, err = t.andNot(andObjects, w.Field, v)
 			}
 		case request.SMALLER:
 			if andObjects == nil {
-				results = index.Smaller(v)
+				results = i.Smaller(v)
 			} else {
 				results, err = t.andSmaller(andObjects, w.Field, v)
 			}
 		case request.LARGER:
 			if andObjects == nil {
-				results = index.Larger(v)
+				results = i.Larger(v)
 			} else {
 				results, err = t.andLarger(andObjects, w.Field, v)
 			}
@@ -489,13 +496,13 @@ func (t *Table) FindExisting(object map[string]json.RawMessage) (int64, error) {
 		}
 
 		if f.Indexed && f.Unique {
-			index, err := t.GetIndex(fieldName)
+			i, err := t.GetIndex(fieldName)
 
 			if err != nil {
 				panic(err.Error())
 			}
 
-			indexElements := index.Equal(value)
+			indexElements := i.Equal(value)
 
 			if len(indexElements) > 0 {
 				return indexElements[0], nil
@@ -522,22 +529,22 @@ func (t *Table) and(objects object.Objects, otherObjects object.Objects) object.
 }
 
 func (t *Table) Sort(o object.Objects, fieldName string, additionalFields AdditionalFields, direction request.SortDirection) (object.Objects, error) {
-	index, err := t.GetIndex(fieldName)
+	i, err := t.GetIndex(fieldName)
 
 	if err != nil {
 		return nil, err
 	}
 
-	gsort.Slice(o, func(i, j int) bool {
-		iv := additionalFields[o[i]][fieldName]
+	sort.Slice(o, func(k, j int) bool {
+		iv := additionalFields[o[k]][fieldName]
 		jv := additionalFields[o[j]][fieldName]
 
 		if iv == nil {
-			iv = index.GetValue(o[i])
+			iv = i.GetValue(o[k])
 		}
 
 		if jv == nil {
-			jv = index.GetValue(o[j])
+			jv = i.GetValue(o[j])
 		}
 
 		if iv == nil || jv == nil {
@@ -583,13 +590,13 @@ func (t *Table) SkipAndLimit(objects object.Objects, skip *int64, limit *int64) 
 func (t *Table) isUnique(o *object.Object) error {
 	for fieldName, f := range t.Config.Fields {
 		if f.Unique && f.Name != field.InternalObjectIdField {
-			index, err := t.GetIndex(fieldName)
+			i, err := t.GetIndex(fieldName)
 
 			if err != nil {
 				panic(err.Error())
 			}
 
-			if len(index.Equal(o.M[fieldName])) > 0 {
+			if len(i.Equal(o.M[fieldName])) > 0 {
 				return e.FoundExistingObjectWithField(fieldName)
 			}
 		}
@@ -600,17 +607,17 @@ func (t *Table) isUnique(o *object.Object) error {
 		var objects object.Objects
 
 		for _, fieldName := range fieldNames {
-			index, err := t.GetIndex(fieldName)
+			i, err := t.GetIndex(fieldName)
 
 			if err != nil {
 				panic(err.Error())
 			}
 
 			if first {
-				objects = index.Equal(o.M[fieldName])
+				objects = i.Equal(o.M[fieldName])
 				first = false
 			} else {
-				objects = t.and(objects, index.Equal(o.M[fieldName]))
+				objects = t.and(objects, i.Equal(o.M[fieldName]))
 
 				if len(objects) == 0 {
 					break
@@ -639,14 +646,14 @@ func (t *Table) allFieldsHaveValues(o *object.Object) error {
 func (t *Table) andEqual(andObjects object.Objects, field string, value dbtype.DBType) (object.Objects, error) {
 	results := object.Objects{}
 
-	index, err := t.GetIndex(field)
+	i, err := t.GetIndex(field)
 
 	if err != nil {
 		return nil, err
 	}
 
 	for _, andObject := range andObjects {
-		if index.GetValue(andObject).Equal(value) {
+		if i.GetValue(andObject).Equal(value) {
 			results = append(results, andObject)
 		}
 	}
@@ -657,14 +664,14 @@ func (t *Table) andEqual(andObjects object.Objects, field string, value dbtype.D
 func (t *Table) andNot(andObjects object.Objects, field string, value dbtype.DBType) (object.Objects, error) {
 	results := object.Objects{}
 
-	index, err := t.GetIndex(field)
+	i, err := t.GetIndex(field)
 
 	if err != nil {
 		return nil, err
 	}
 
 	for _, andObject := range andObjects {
-		if index.GetValue(andObject).Not(value) {
+		if i.GetValue(andObject).Not(value) {
 			results = append(results, andObject)
 		}
 	}
@@ -675,14 +682,14 @@ func (t *Table) andNot(andObjects object.Objects, field string, value dbtype.DBT
 func (t *Table) andMatch(andObjects object.Objects, field string, r regexp.Regexp) (object.Objects, error) {
 	results := object.Objects{}
 
-	index, err := t.GetIndex(field)
+	i, err := t.GetIndex(field)
 
 	if err != nil {
 		return nil, err
 	}
 
 	for _, andObject := range andObjects {
-		if index.GetValue(andObject).Matches(r) {
+		if i.GetValue(andObject).Matches(r) {
 			results = append(results, andObject)
 		}
 	}
@@ -693,14 +700,14 @@ func (t *Table) andMatch(andObjects object.Objects, field string, r regexp.Regex
 func (t *Table) andSmaller(andObjects object.Objects, field string, value dbtype.DBType) (object.Objects, error) {
 	results := object.Objects{}
 
-	index, err := t.GetIndex(field)
+	i, err := t.GetIndex(field)
 
 	if err != nil {
 		return nil, err
 	}
 
 	for _, andObject := range andObjects {
-		if index.GetValue(andObject).Smaller(value) {
+		if i.GetValue(andObject).Smaller(value) {
 			results = append(results, andObject)
 		}
 	}
@@ -711,14 +718,14 @@ func (t *Table) andSmaller(andObjects object.Objects, field string, value dbtype
 func (t *Table) andLarger(andObjects object.Objects, field string, value dbtype.DBType) (object.Objects, error) {
 	results := object.Objects{}
 
-	index, err := t.GetIndex(field)
+	i, err := t.GetIndex(field)
 
 	if err != nil {
 		return nil, err
 	}
 
 	for _, andObject := range andObjects {
-		if index.GetValue(andObject).Larger(value) {
+		if i.GetValue(andObject).Larger(value) {
 			results = append(results, andObject)
 		}
 	}
@@ -729,14 +736,14 @@ func (t *Table) andLarger(andObjects object.Objects, field string, value dbtype.
 func (t *Table) andBetween(andObjects object.Objects, field string, smaller dbtype.DBType, larger dbtype.DBType) (object.Objects, error) {
 	results := object.Objects{}
 
-	index, err := t.GetIndex(field)
+	i, err := t.GetIndex(field)
 
 	if err != nil {
 		return nil, err
 	}
 
 	for _, andObject := range andObjects {
-		if index.GetValue(andObject).Between(smaller, larger) {
+		if i.GetValue(andObject).Between(smaller, larger) {
 			results = append(results, andObject)
 		}
 	}
