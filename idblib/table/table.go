@@ -21,7 +21,6 @@ import (
 	"regexp"
 	gsort "sort"
 	"strings"
-	"sync"
 )
 
 type Table struct {
@@ -105,23 +104,15 @@ func (t *Table) GetIndex(fieldName string) (*field.Index, error) {
 }
 
 func (t *Table) index(object object.Object) {
-	var wg sync.WaitGroup
-
 	for _, f := range t.Config.Fields {
 		if f.Indexed && f.Name != field.InternalObjectIdField {
-			wg.Add(1)
+			i, err := t.GetIndex(f.Name)
 
-			go func(fieldName string) {
-				i, err := t.GetIndex(fieldName)
+			if err != nil {
+				panic(err.Error())
+			}
 
-				if err != nil {
-					panic(err.Error())
-				}
-
-				i.Add(object.M[fieldName], object.Id)
-
-				wg.Done()
-			}(f.Name)
+			i.Add(object.M[f.Name], object.Id)
 		}
 	}
 
@@ -131,59 +122,35 @@ func (t *Table) index(object object.Object) {
 		panic(err.Error())
 	}
 
-	wg.Add(1)
+	i, err := t.GetIndex(field.InternalObjectIdField)
 
-	go func() {
-		i, err := t.GetIndex(field.InternalObjectIdField)
+	if err != nil {
+		panic(err.Error())
+	}
 
-		if err != nil {
-			panic(err.Error())
-		}
-
-		i.Add(n, object.Id)
-
-		wg.Done()
-	}()
-
-	wg.Wait()
+	i.Add(n, object.Id)
 }
 
 func (t *Table) unIndex(object object.Object) {
-	var wg sync.WaitGroup
-
 	for _, f := range t.Config.Fields {
 		if f.Indexed && f.Name != field.InternalObjectIdField {
-			wg.Add(1)
+			i, err := t.GetIndex(f.Name)
 
-			go func(fieldName string) {
-				i, err := t.GetIndex(fieldName)
+			if err != nil {
+				panic(err.Error())
+			}
 
-				if err != nil {
-					panic(err.Error())
-				}
-
-				i.Remove(object.Id)
-
-				wg.Done()
-			}(f.Name)
+			i.Remove(object.Id)
 		}
 	}
 
-	wg.Add(1)
+	i, err := t.GetIndex(field.InternalObjectIdField)
 
-	go func() {
-		i, err := t.GetIndex(field.InternalObjectIdField)
+	if err != nil {
+		panic(err.Error())
+	}
 
-		if err != nil {
-			panic(err.Error())
-		}
-
-		i.Remove(object.Id)
-
-		wg.Done()
-	}()
-
-	wg.Wait()
+	i.Remove(object.Id)
 }
 
 func (t *Table) updateIndex(object object.Object) {
@@ -614,79 +581,44 @@ func (t *Table) SkipAndLimit(objects object.Objects, skip *int64, limit *int64) 
 }
 
 func (t *Table) isUnique(o *object.Object) error {
-	errs := make(chan error, len(t.Config.Fields))
-	var wg sync.WaitGroup
-
 	for fieldName, f := range t.Config.Fields {
 		if f.Unique && f.Name != field.InternalObjectIdField {
-			wg.Add(1)
+			index, err := t.GetIndex(fieldName)
 
-			go func(fieldName string) {
-				index, err := t.GetIndex(fieldName)
+			if err != nil {
+				panic(err.Error())
+			}
 
-				if err != nil {
-					panic(err.Error())
-				}
-
-				if len(index.Equal(o.M[fieldName])) > 0 {
-					errs <- e.FoundExistingObjectWithField(fieldName)
-				}
-
-				wg.Done()
-			}(fieldName)
-		}
-	}
-
-	wg.Wait()
-	close(errs)
-
-	for err := range errs {
-		if err != nil {
-			return err
+			if len(index.Equal(o.M[fieldName])) > 0 {
+				return e.FoundExistingObjectWithField(fieldName)
+			}
 		}
 	}
 
 	for _, fieldNames := range t.Config.Options.CombinedUniques {
 		var first = true
-		firstObjects := make(chan object.Objects, 1)
-		objects := make(chan object.Objects, len(fieldNames))
+		var objects object.Objects
 
 		for _, fieldName := range fieldNames {
-			wg.Add(1)
+			index, err := t.GetIndex(fieldName)
 
-			go func(fieldName string, first bool) {
-				index, err := t.GetIndex(fieldName)
-
-				if err != nil {
-					panic(err.Error())
-				}
-
-				if first {
-					firstObjects <- index.Equal(o.M[fieldName])
-				} else {
-					objects <- index.Equal(o.M[fieldName])
-				}
-
-				wg.Done()
-			}(fieldName, first)
+			if err != nil {
+				panic(err.Error())
+			}
 
 			if first {
+				objects = index.Equal(o.M[fieldName])
 				first = false
+			} else {
+				objects = t.and(objects, index.Equal(o.M[fieldName]))
+
+				if len(objects) == 0 {
+					break
+				}
 			}
 		}
 
-		wg.Wait()
-
-		close(firstObjects)
-		close(objects)
-
-		existingObjects := <-firstObjects
-
-		for objects := range objects {
-			existingObjects = t.and(existingObjects, objects)
-		}
-
-		if len(existingObjects) != 0 {
+		if len(objects) != 0 {
 			return e.FoundExistingObjectWithCombinedUniques()
 		}
 	}

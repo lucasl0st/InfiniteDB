@@ -14,15 +14,22 @@ import (
 const InternalObjectIdField = "INTERNAL_OBJECT_ID"
 
 type Index struct {
-	// fieldName -> objectId -> value
-	values map[int64]dbtype.DBType
+	core int
+
+	// cpu core -> fieldName -> objectId -> value
+	values map[int]map[int64]dbtype.DBType
 
 	sync.RWMutex
 }
 
 func NewIndex() *Index {
 	index := &Index{
-		values: map[int64]dbtype.DBType{},
+		core:   0,
+		values: map[int]map[int64]dbtype.DBType{},
+	}
+
+	for i := 0; i < runtime.NumCPU(); i++ {
+		index.values[i] = map[int64]dbtype.DBType{}
 	}
 
 	return index
@@ -32,120 +39,109 @@ func (i *Index) Add(value dbtype.DBType, id int64) {
 	i.Lock()
 	defer i.Unlock()
 
-	i.values[id] = value
+	if i.core >= len(i.values) {
+		i.core = 0
+	}
+
+	i.values[i.core][id] = value
+
+	i.core++
 }
 
 func (i *Index) Remove(id int64) {
 	i.Lock()
 	defer i.Unlock()
 
-	delete(i.values, id)
+	for k := 0; k < len(i.values); k++ {
+		delete(i.values[k], id)
+	}
 }
 
 func (i *Index) GetValue(id int64) dbtype.DBType {
 	i.RLock()
 	defer i.RUnlock()
 
-	return i.values[id]
+	for k := 0; k < len(i.values); k++ {
+		value, ok := i.values[k][id]
+
+		if ok {
+			return value
+		}
+	}
+
+	return nil
 }
 
-func (i *Index) rangeMap(compare func(id int64, compareValue dbtype.DBType)) {
+func (i *Index) rangeMap(compare func(compareValue dbtype.DBType) bool) []int64 {
 	i.RLock()
 	defer i.RUnlock()
 
-	keys := make(chan int64, len(i.values))
-
-	for k := range i.values {
-		keys <- k
-	}
-
-	close(keys)
-
+	resultsChan := make(chan []int64, len(i.values)+1)
 	var wg sync.WaitGroup
 
-	for k := 0; k < runtime.NumCPU(); k++ {
+	for k := 0; k < len(i.values); k++ {
 		wg.Add(1)
 
-		go func() {
-			for key := range keys {
-				compare(key, i.values[key])
+		go func(i *Index, core int) {
+			defer wg.Done()
+
+			var results []int64
+
+			for id, value := range i.values[core] {
+				if compare(value) {
+					results = append(results, id)
+				}
 			}
 
-			wg.Done()
-		}()
+			resultsChan <- results
+		}(i, k)
 	}
 
 	wg.Wait()
+
+	close(resultsChan)
+
+	var results []int64
+
+	for result := range resultsChan {
+		results = append(results, result...)
+	}
+
+	return results
 }
 
 func (i *Index) Equal(value dbtype.DBType) []int64 {
-	var results []int64
-
-	i.rangeMap(func(id int64, compareValue dbtype.DBType) {
-		if compareValue.Equal(value) {
-			results = append(results, id)
-		}
+	return i.rangeMap(func(compareValue dbtype.DBType) bool {
+		return compareValue.Equal(value)
 	})
-
-	return results
 }
 
 func (i *Index) Not(value dbtype.DBType) []int64 {
-	var results []int64
-
-	i.rangeMap(func(id int64, compareValue dbtype.DBType) {
-		if compareValue.Not(value) {
-			results = append(results, id)
-		}
+	return i.rangeMap(func(compareValue dbtype.DBType) bool {
+		return compareValue.Not(value)
 	})
-
-	return results
 }
 
 func (i *Index) Match(r regexp.Regexp) []int64 {
-	var results []int64
-
-	i.rangeMap(func(id int64, compareValue dbtype.DBType) {
-		if compareValue.Matches(r) {
-			results = append(results, id)
-		}
+	return i.rangeMap(func(compareValue dbtype.DBType) bool {
+		return compareValue.Matches(r)
 	})
-
-	return results
 }
 
 func (i *Index) Larger(value dbtype.DBType) []int64 {
-	var results []int64
-
-	i.rangeMap(func(id int64, compareValue dbtype.DBType) {
-		if compareValue.Larger(value) {
-			results = append(results, id)
-		}
+	return i.rangeMap(func(compareValue dbtype.DBType) bool {
+		return compareValue.Larger(value)
 	})
-
-	return results
 }
 
 func (i *Index) Smaller(value dbtype.DBType) []int64 {
-	var results []int64
-
-	i.rangeMap(func(id int64, compareValue dbtype.DBType) {
-		if compareValue.Smaller(value) {
-			results = append(results, id)
-		}
+	return i.rangeMap(func(compareValue dbtype.DBType) bool {
+		return compareValue.Smaller(value)
 	})
-
-	return results
 }
 
 func (i *Index) Between(smaller dbtype.DBType, larger dbtype.DBType) []int64 {
-	var results []int64
-
-	i.rangeMap(func(id int64, compareValue dbtype.DBType) {
-		if compareValue.Between(smaller, larger) {
-			results = append(results, id)
-		}
+	return i.rangeMap(func(compareValue dbtype.DBType) bool {
+		return compareValue.Between(smaller, larger)
 	})
-
-	return results
 }
