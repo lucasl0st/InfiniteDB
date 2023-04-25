@@ -61,11 +61,15 @@ func NewTable(
 
 	table.indexes[field.InternalObjectIdField] = index.NewIndex()
 
-	s, err := storage.NewStorage(path+name+"/", table.addedObject, table.deletedObject, logger, metrics, cacheSize, config.Fields)
+	s, err := storage.NewStorage(path+name+"/", func(object object.Object) {
+		table.index(object)
+	}, table.deletedObject, logger, metrics, cacheSize, config.Fields)
 
 	if err != nil {
 		return nil, err
 	}
+
+	s.AddedObject = table.addedObject
 
 	table.Storage = s
 
