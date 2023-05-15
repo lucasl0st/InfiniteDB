@@ -3,7 +3,7 @@ module github.com/lucasl0st/InfiniteDB
 go 1.20
 
 require (
-	github.com/magefile/mage v1.14.0
+	github.com/magefile/mage v1.15.0
 	nhooyr.io/websocket v1.8.7
 )
 
