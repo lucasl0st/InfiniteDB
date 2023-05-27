@@ -2,7 +2,7 @@
  * Copyright (c) 2023 Lucas Pape
  */
 
-package server
+package internal_database
 
 import (
 	"encoding/json"
@@ -11,6 +11,7 @@ import (
 	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
+	idbutil "github.com/lucasl0st/InfiniteDB/idblib/util"
 	"github.com/lucasl0st/InfiniteDB/models/request"
 	"github.com/lucasl0st/InfiniteDB/util"
 )
@@ -22,6 +23,12 @@ const AuthenticationTableFieldKeyId = "keyID"
 const AuthenticationTableFieldKeyValue = "keyValue"
 
 const AuthenticationKeyMain = "main"
+
+var l idbutil.Logger
+
+func SetLogger(logger idbutil.Logger) {
+	l = logger
+}
 
 func SetupInternalDatabase(idb *idblib.IDB) error {
 	r, err := idb.GetDatabases()
@@ -117,7 +124,7 @@ func SetupAuthenticationTable(idb *idblib.IDB) error {
 	return nil
 }
 
-func authenticated(idb *idblib.IDB, key string) (bool, error) {
+func Authenticated(idb *idblib.IDB, key string) (bool, error) {
 	res, err := idb.GetFromDatabaseTable(InternalDatabase, AuthenticationTable, table.Request{
 		Query: &table.Query{
 			Where: &request.Where{

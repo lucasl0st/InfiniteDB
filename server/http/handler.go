@@ -2,58 +2,23 @@
  * Copyright (c) 2023 Lucas Pape
  */
 
-package server
+package http
 
 import (
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/lucasl0st/InfiniteDB/idblib"
 	"github.com/lucasl0st/InfiniteDB/models/request"
+	"github.com/lucasl0st/InfiniteDB/server/internal_database"
+	"github.com/lucasl0st/InfiniteDB/server/parse"
 	"github.com/lucasl0st/InfiniteDB/server/util"
 	"io"
 	"net/http"
 )
 
-const apiPrefix = ""
-
-type HttpApi struct {
-	idb            *idblib.IDB
-	authentication bool
-	shutdown       func()
-}
-
-func (h *HttpApi) Run(r *gin.Engine) {
-	h.registerHandlers(r)
-}
-
-func (h *HttpApi) registerHandlers(r *gin.Engine) {
-	r.Use(h.authenticationHandler())
-
-	r.GET(apiPrefix+"/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"message": "Hello world"})
-	})
-
-	r.GET(apiPrefix+"/health", h.healthHandler)
-	r.GET(apiPrefix+"/version", h.versionHandler)
-	r.GET(apiPrefix+"/shutdown", h.shutdownHandler)
-
-	r.GET(apiPrefix+"/databases", h.getDatabasesHandler)
-	r.POST(apiPrefix+"/database", h.createDatabaseHandler)
-	r.DELETE(apiPrefix+"/database/:name", h.deleteDatabaseHandler)
-	r.GET(apiPrefix+"/database/:name", h.getDatabaseHandler)
-	r.GET(apiPrefix+"/database/:name/table/:tableName", h.getDatabaseTableHandler)
-	r.POST(apiPrefix+"/database/:name/table", h.createTableInDatabaseHandler)
-	r.DELETE(apiPrefix+"/database/:name/table/:tableName", h.deleteTableInDatabaseHandler)
-	r.POST(apiPrefix+"/database/:name/table/:tableName/get", h.getFromDatabaseTableHandler)
-	r.POST(apiPrefix+"/database/:name/table/:tableName/insert", h.insertToDatabaseTableHandler)
-	r.POST(apiPrefix+"/database/:name/table/:tableName/remove", h.removeFromDatabaseTableHandler)
-	r.POST(apiPrefix+"/database/:name/table/:tableName/update", h.updateInDatabaseTableHandler)
-}
-
-func (h *HttpApi) authenticationHandler() gin.HandlerFunc {
+func (a *Api) authenticationHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !h.authentication {
+		if !a.authentication {
 			return
 		}
 
@@ -61,7 +26,7 @@ func (h *HttpApi) authenticationHandler() gin.HandlerFunc {
 			return
 		}
 
-		a, err := authenticated(h.idb, c.GetHeader("Authorization"))
+		a, err := internal_database.Authenticated(a.idb, c.GetHeader("Authorization"))
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
@@ -77,20 +42,20 @@ func (h *HttpApi) authenticationHandler() gin.HandlerFunc {
 	}
 }
 
-func (h *HttpApi) healthHandler(c *gin.Context) {
+func (a *Api) healthHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
-func (h *HttpApi) versionHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"database_version": VERSION})
+func (a *Api) versionHandler(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"database_version": util.SERVER_VERSION})
 }
 
-func (h *HttpApi) shutdownHandler(_ *gin.Context) {
-	h.shutdown()
+func (a *Api) shutdownHandler(_ *gin.Context) {
+	a.shutdown()
 }
 
-func (h *HttpApi) getDatabasesHandler(c *gin.Context) {
-	results, err := h.idb.GetDatabases()
+func (a *Api) getDatabasesHandler(c *gin.Context) {
+	results, err := a.idb.GetDatabases()
 
 	if err == nil {
 		c.JSON(http.StatusOK, results)
@@ -99,8 +64,8 @@ func (h *HttpApi) getDatabasesHandler(c *gin.Context) {
 	}
 }
 
-func (h *HttpApi) createDatabaseHandler(c *gin.Context) {
-	body := h.getBody(c)
+func (a *Api) createDatabaseHandler(c *gin.Context) {
+	body := a.getBody(c)
 
 	if body != nil {
 		name, isString := (*body)["name"].(string)
@@ -110,14 +75,14 @@ func (h *HttpApi) createDatabaseHandler(c *gin.Context) {
 			return
 		}
 
-		err := validateName(name)
+		err := util.ValidateName(name)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
 			return
 		}
 
-		results, err := h.idb.CreateDatabase(name)
+		results, err := a.idb.CreateDatabase(name)
 
 		if err == nil {
 			c.JSON(http.StatusOK, results)
@@ -127,17 +92,17 @@ func (h *HttpApi) createDatabaseHandler(c *gin.Context) {
 	}
 }
 
-func (h *HttpApi) deleteDatabaseHandler(c *gin.Context) {
+func (a *Api) deleteDatabaseHandler(c *gin.Context) {
 	name := c.Param("name")
 
-	err := validateName(name)
+	err := util.ValidateName(name)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
 		return
 	}
 
-	results, err := h.idb.DeleteDatabase(name)
+	results, err := a.idb.DeleteDatabase(name)
 
 	if err == nil {
 		c.JSON(http.StatusOK, results)
@@ -146,17 +111,17 @@ func (h *HttpApi) deleteDatabaseHandler(c *gin.Context) {
 	}
 }
 
-func (h *HttpApi) getDatabaseHandler(c *gin.Context) {
+func (a *Api) getDatabaseHandler(c *gin.Context) {
 	name := c.Param("name")
 
-	err := validateName(name)
+	err := util.ValidateName(name)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
 		return
 	}
 
-	results, err := h.idb.GetDatabase(name)
+	results, err := a.idb.GetDatabase(name)
 
 	if err == nil {
 		c.JSON(http.StatusOK, results)
@@ -165,10 +130,10 @@ func (h *HttpApi) getDatabaseHandler(c *gin.Context) {
 	}
 }
 
-func (h *HttpApi) getDatabaseTableHandler(c *gin.Context) {
+func (a *Api) getDatabaseTableHandler(c *gin.Context) {
 	name := c.Param("name")
 
-	err := validateName(name)
+	err := util.ValidateName(name)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
@@ -177,14 +142,14 @@ func (h *HttpApi) getDatabaseTableHandler(c *gin.Context) {
 
 	tableName := c.Param("tableName")
 
-	err = validateName(tableName)
+	err = util.ValidateName(tableName)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
 		return
 	}
 
-	results, err := h.idb.GetDatabaseTable(name, tableName)
+	results, err := a.idb.GetDatabaseTable(name, tableName)
 
 	if err == nil {
 		c.JSON(http.StatusOK, results)
@@ -193,13 +158,13 @@ func (h *HttpApi) getDatabaseTableHandler(c *gin.Context) {
 	}
 }
 
-func (h *HttpApi) createTableInDatabaseHandler(c *gin.Context) {
-	body := h.getBody(c)
+func (a *Api) createTableInDatabaseHandler(c *gin.Context) {
+	body := a.getBody(c)
 
 	if body != nil {
 		name := c.Param("name")
 
-		err := validateName(name)
+		err := util.ValidateName(name)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
@@ -208,7 +173,7 @@ func (h *HttpApi) createTableInDatabaseHandler(c *gin.Context) {
 
 		tableName, isString := (*body)["name"].(string)
 
-		err = validateName(tableName)
+		err = util.ValidateName(tableName)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
@@ -249,14 +214,14 @@ func (h *HttpApi) createTableInDatabaseHandler(c *gin.Context) {
 			return
 		}
 
-		parsedFields, err := parseFields(f)
+		parsedFields, err := parse.Fields(f)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
 			return
 		}
 
-		results, err := h.idb.CreateTableInDatabase(name, tableName, parsedFields, o)
+		results, err := a.idb.CreateTableInDatabase(name, tableName, parsedFields, o)
 
 		if err == nil {
 			c.JSON(http.StatusOK, results)
@@ -266,10 +231,10 @@ func (h *HttpApi) createTableInDatabaseHandler(c *gin.Context) {
 	}
 }
 
-func (h *HttpApi) deleteTableInDatabaseHandler(c *gin.Context) {
+func (a *Api) deleteTableInDatabaseHandler(c *gin.Context) {
 	name := c.Param("name")
 
-	err := validateName(name)
+	err := util.ValidateName(name)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
@@ -278,14 +243,14 @@ func (h *HttpApi) deleteTableInDatabaseHandler(c *gin.Context) {
 
 	tableName := c.Param("tableName")
 
-	err = validateName(tableName)
+	err = util.ValidateName(tableName)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
 		return
 	}
 
-	results, err := h.idb.DeleteTableInDatabase(name, tableName)
+	results, err := a.idb.DeleteTableInDatabase(name, tableName)
 
 	if err == nil {
 		c.JSON(http.StatusOK, results)
@@ -294,13 +259,13 @@ func (h *HttpApi) deleteTableInDatabaseHandler(c *gin.Context) {
 	}
 }
 
-func (h *HttpApi) getFromDatabaseTableHandler(c *gin.Context) {
-	r := h.getRequest(c)
+func (a *Api) getFromDatabaseTableHandler(c *gin.Context) {
+	r := a.getRequest(c)
 
 	if r != nil {
 		name := c.Param("name")
 
-		err := validateName(name)
+		err := util.ValidateName(name)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
@@ -309,21 +274,21 @@ func (h *HttpApi) getFromDatabaseTableHandler(c *gin.Context) {
 
 		tableName := c.Param("tableName")
 
-		err = validateName(tableName)
+		err = util.ValidateName(tableName)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
 			return
 		}
 
-		parsedRequest, err := parseRequest(*r)
+		parsedRequest, err := parse.Request(*r)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
 			return
 		}
 
-		results, err := h.idb.GetFromDatabaseTable(name, tableName, *parsedRequest)
+		results, err := a.idb.GetFromDatabaseTable(name, tableName, *parsedRequest)
 
 		if err == nil {
 			c.JSON(http.StatusOK, results)
@@ -333,13 +298,13 @@ func (h *HttpApi) getFromDatabaseTableHandler(c *gin.Context) {
 	}
 }
 
-func (h *HttpApi) insertToDatabaseTableHandler(c *gin.Context) {
-	body := h.getJsonRawBody(c)
+func (a *Api) insertToDatabaseTableHandler(c *gin.Context) {
+	body := a.getJsonRawBody(c)
 
 	if body != nil {
 		name := c.Param("name")
 
-		err := validateName(name)
+		err := util.ValidateName(name)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
@@ -348,14 +313,14 @@ func (h *HttpApi) insertToDatabaseTableHandler(c *gin.Context) {
 
 		tableName := c.Param("tableName")
 
-		err = validateName(tableName)
+		err = util.ValidateName(tableName)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
 			return
 		}
 
-		results, err := h.idb.InsertToDatabaseTable(name, tableName, *body)
+		results, err := a.idb.InsertToDatabaseTable(name, tableName, *body)
 
 		if err == nil {
 			c.JSON(http.StatusOK, results)
@@ -365,13 +330,13 @@ func (h *HttpApi) insertToDatabaseTableHandler(c *gin.Context) {
 	}
 }
 
-func (h *HttpApi) removeFromDatabaseTableHandler(c *gin.Context) {
-	r := h.getRequest(c)
+func (a *Api) removeFromDatabaseTableHandler(c *gin.Context) {
+	r := a.getRequest(c)
 
 	if r != nil {
 		name := c.Param("name")
 
-		err := validateName(name)
+		err := util.ValidateName(name)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
@@ -380,21 +345,21 @@ func (h *HttpApi) removeFromDatabaseTableHandler(c *gin.Context) {
 
 		tableName := c.Param("tableName")
 
-		err = validateName(tableName)
+		err = util.ValidateName(tableName)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
 			return
 		}
 
-		parsedRequest, err := parseRequest(*r)
+		parsedRequest, err := parse.Request(*r)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
 			return
 		}
 
-		results, err := h.idb.RemoveFromDatabaseTable(name, tableName, *parsedRequest)
+		results, err := a.idb.RemoveFromDatabaseTable(name, tableName, *parsedRequest)
 
 		if err == nil {
 			c.JSON(http.StatusOK, results)
@@ -404,13 +369,13 @@ func (h *HttpApi) removeFromDatabaseTableHandler(c *gin.Context) {
 	}
 }
 
-func (h *HttpApi) updateInDatabaseTableHandler(c *gin.Context) {
-	body := h.getJsonRawBody(c)
+func (a *Api) updateInDatabaseTableHandler(c *gin.Context) {
+	body := a.getJsonRawBody(c)
 
 	if body != nil {
 		name := c.Param("name")
 
-		err := validateName(name)
+		err := util.ValidateName(name)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
@@ -419,14 +384,14 @@ func (h *HttpApi) updateInDatabaseTableHandler(c *gin.Context) {
 
 		tableName := c.Param("tableName")
 
-		err = validateName(tableName)
+		err = util.ValidateName(tableName)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprint(err)})
 			return
 		}
 
-		results, err := h.idb.UpdateInDatabaseTable(name, tableName, *body)
+		results, err := a.idb.UpdateInDatabaseTable(name, tableName, *body)
 
 		if err == nil {
 			c.JSON(http.StatusOK, results)
@@ -436,7 +401,7 @@ func (h *HttpApi) updateInDatabaseTableHandler(c *gin.Context) {
 	}
 }
 
-func (h *HttpApi) getBody(c *gin.Context) *map[string]interface{} {
+func (a *Api) getBody(c *gin.Context) *map[string]interface{} {
 	bytes, err := io.ReadAll(c.Request.Body)
 
 	if err != nil {
@@ -455,7 +420,7 @@ func (h *HttpApi) getBody(c *gin.Context) *map[string]interface{} {
 	return &m
 }
 
-func (h *HttpApi) getJsonRawBody(c *gin.Context) *map[string]json.RawMessage {
+func (a *Api) getJsonRawBody(c *gin.Context) *map[string]json.RawMessage {
 	bytes, err := io.ReadAll(c.Request.Body)
 
 	if err != nil {
@@ -475,7 +440,7 @@ func (h *HttpApi) getJsonRawBody(c *gin.Context) *map[string]json.RawMessage {
 	return &m
 }
 
-func (h *HttpApi) getRequest(c *gin.Context) *request.Request {
+func (a *Api) getRequest(c *gin.Context) *request.Request {
 	bytes, err := io.ReadAll(c.Request.Body)
 
 	if err != nil {

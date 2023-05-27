@@ -11,7 +11,7 @@ import (
 	"github.com/lucasl0st/InfiniteDB/client"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
 	"github.com/lucasl0st/InfiniteDB/models/request"
-	"github.com/lucasl0st/InfiniteDB/server"
+	"github.com/lucasl0st/InfiniteDB/server/internal_database"
 	toolsutil "github.com/lucasl0st/InfiniteDB/tools/util"
 	"github.com/lucasl0st/InfiniteDB/util"
 )
@@ -53,7 +53,7 @@ func (dump *Dump) Dump() error {
 }
 
 func (dump *Dump) database(d string) error {
-	if d == server.InternalDatabase {
+	if d == internal_database.InternalDatabase {
 		return nil
 	}
 

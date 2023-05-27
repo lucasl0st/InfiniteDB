@@ -2,7 +2,7 @@
  * Copyright (c) 2023 Lucas Pape
  */
 
-package server
+package parse
 
 import (
 	"encoding/json"
@@ -14,13 +14,13 @@ import (
 	"github.com/lucasl0st/InfiniteDB/models/request"
 )
 
-func parseRequest(r request.Request) (*table.Request, error) {
+func Request(r request.Request) (*table.Request, error) {
 	var err error
 
 	var q *table.Query
 
 	if r.Query != nil {
-		q, err = parseQuery(*r.Query)
+		q, err = Query(*r.Query)
 
 		if err != nil {
 			return nil, err
@@ -36,8 +36,8 @@ func parseRequest(r request.Request) (*table.Request, error) {
 	}, nil
 }
 
-func parseQuery(q request.Query) (*table.Query, error) {
-	f, err := parseFunctions(q.Functions)
+func Query(q request.Query) (*table.Query, error) {
+	f, err := Functions(q.Functions)
 
 	if err != nil {
 		return nil, err
@@ -46,7 +46,7 @@ func parseQuery(q request.Query) (*table.Query, error) {
 	var and *table.Query = nil
 
 	if q.And != nil {
-		and, err = parseQuery(*q.And)
+		and, err = Query(*q.And)
 
 		if err != nil {
 			return nil, err
@@ -56,7 +56,7 @@ func parseQuery(q request.Query) (*table.Query, error) {
 	var or *table.Query = nil
 
 	if q.Or != nil {
-		or, err = parseQuery(*q.Or)
+		or, err = Query(*q.Or)
 
 		if err != nil {
 			return nil, err
@@ -83,7 +83,7 @@ func parseQuery(q request.Query) (*table.Query, error) {
 	return &query, nil
 }
 
-func parseFunctions(f []request.Function) ([]table.FunctionWithParameters, error) {
+func Functions(f []request.Function) ([]table.FunctionWithParameters, error) {
 	var results []table.FunctionWithParameters
 
 	for _, function := range f {
@@ -114,7 +114,7 @@ func parseFunctions(f []request.Function) ([]table.FunctionWithParameters, error
 	return results, nil
 }
 
-func parseFields(fields map[string]request.Field) (map[string]field.Field, error) {
+func Fields(fields map[string]request.Field) (map[string]field.Field, error) {
 	resultMap := make(map[string]field.Field)
 
 	for fieldName, f := range fields {
