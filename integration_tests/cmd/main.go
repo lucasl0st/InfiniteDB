@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/lucasl0st/InfiniteDB/client"
-	"github.com/lucasl0st/InfiniteDB/integration_tests"
+	"github.com/lucasl0st/InfiniteDB/integration_tests/test"
 	"io"
 	"log"
 	"os"
@@ -83,6 +83,7 @@ func setup(serverBinary string, coverageOutDir string) (*exec.Cmd, error) {
 		fmt.Sprintf("DATABASE_PATH=%s", dir),
 		fmt.Sprintf("PORT=%v", Port),
 		"AUTHENTICATION=false",
+		"REQUEST_LOGGING=true",
 	}
 
 	stdout, err := cmd.StdoutPipe()
@@ -154,7 +155,7 @@ func kill(cmd *exec.Cmd) error {
 
 	log.Println("killed infinitedb-server")
 
-	return nil
+	return cmd.Wait()
 }
 
 func runTests() error {
@@ -169,13 +170,13 @@ func runTests() error {
 		return errors.New(fmt.Sprintf("failed to connect to server: %s", err.Error()))
 	}
 
-	for _, test := range integration_tests.Tests {
-		log.Printf("running test %s\n", test.Name)
+	for _, t := range test.Tests {
+		log.Printf("running test %s\n", t.Name)
 
-		err := test.Run(c)
+		err = t.Run(c)
 
 		if err != nil {
-			fmt.Printf("test %s failed with error: %s", test.Name, err.Error())
+			fmt.Printf("test %s failed with error: %s", t.Name, err.Error())
 		}
 	}
 
