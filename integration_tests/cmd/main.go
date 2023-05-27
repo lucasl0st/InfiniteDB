@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/lucasl0st/InfiniteDB/client"
-	"github.com/lucasl0st/InfiniteDB/integration_tests"
+	"github.com/lucasl0st/InfiniteDB/integration_tests/test"
 	"io"
 	"log"
 	"os"
@@ -169,7 +169,7 @@ func runTests() error {
 		return errors.New(fmt.Sprintf("failed to connect to server: %s", err.Error()))
 	}
 
-	for _, test := range integration_tests.Tests {
+	for _, test := range test.Tests {
 		log.Printf("running test %s\n", test.Name)
 
 		err := test.Run(c)

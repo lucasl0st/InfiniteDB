@@ -2,7 +2,7 @@
  * Copyright (c) 2023 Lucas Pape
  */
 
-package integration_tests
+package covid19
 
 import (
 	"archive/zip"
@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"github.com/dimchansky/utfbom"
 	"github.com/lucasl0st/InfiniteDB/client"
-	idbutil "github.com/lucasl0st/InfiniteDB/idblib/util"
 	"github.com/lucasl0st/InfiniteDB/models/request"
 	"github.com/lucasl0st/InfiniteDB/util"
 	"io"
@@ -38,7 +37,7 @@ type Data struct {
 	Recovered int64
 }
 
-func runCovid19Tests(c *client.Client) error {
+func Run(c *client.Client) error {
 	f, size, err := download(covid19GermanyUrl)
 
 	if err != nil {
@@ -200,7 +199,7 @@ func maxCases(c *client.Client, objects []Data) error {
 	}
 
 	for state, max := range cases {
-		_, err = c.InsertToDatabaseTable(databaseName, tableName, idbutil.InterfaceMapToJsonRawMap(map[string]interface{}{
+		_, err = c.InsertToDatabaseTable(databaseName, tableName, util.InterfaceMapToJsonRawMap(map[string]interface{}{
 			fieldNameState:    state,
 			fieldNameMaxCases: max,
 		}))
@@ -225,7 +224,7 @@ func maxCases(c *client.Client, objects []Data) error {
 	}
 
 	for _, r := range res.Results {
-		m := idbutil.JsonRawMapToInterfaceMap(r)
+		m := util.JsonRawMapToInterfaceMap(r)
 
 		if m[fieldNameState] != cases[fieldNameState] {
 			return errors.New(fmt.Sprintf("expected %v, got %v", cases[fieldNameState], m[fieldNameState]))

@@ -4,15 +4,12 @@ go 1.20
 
 replace github.com/lucasl0st/InfiniteDB => ../
 
-replace github.com/lucasl0st/InfiniteDB/models => ../models
-
 replace github.com/lucasl0st/InfiniteDB/idblib => ../idblib
 
 require (
 	github.com/dimchansky/utfbom v1.1.1
 	github.com/lucasl0st/InfiniteDB v0.0.0-00010101000000-000000000000
 	github.com/lucasl0st/InfiniteDB/idblib v0.0.0-00010101000000-000000000000
-	github.com/lucasl0st/InfiniteDB/models v0.0.0-00010101000000-000000000000
 	vimagination.zapto.org/dos2unix v1.0.0
 )
 

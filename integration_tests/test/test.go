@@ -2,9 +2,12 @@
  * Copyright (c) 2023 Lucas Pape
  */
 
-package integration_tests
+package test
 
-import "github.com/lucasl0st/InfiniteDB/client"
+import (
+	"github.com/lucasl0st/InfiniteDB/client"
+	"github.com/lucasl0st/InfiniteDB/integration_tests/covid19"
+)
 
 var Tests []Test
 
@@ -16,6 +19,6 @@ type Test struct {
 func init() {
 	Tests = append(Tests, Test{
 		Name: "covid-19",
-		Run:  runCovid19Tests,
+		Run:  covid19.Run,
 	})
 }
