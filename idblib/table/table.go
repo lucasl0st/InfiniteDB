@@ -34,6 +34,8 @@ type Table struct {
 	indexes map[string]*index.Index
 
 	Storage *storage.Storage
+
+	logger idbutil.Logger
 }
 
 func NewTable(
@@ -51,6 +53,7 @@ func NewTable(
 		path:         path,
 		Config:       config,
 		indexes:      map[string]*index.Index{},
+		logger:       logger,
 	}
 
 	for _, f := range config.Fields {
@@ -61,15 +64,19 @@ func NewTable(
 
 	table.indexes[field.InternalObjectIdField] = index.NewIndex()
 
-	s, err := storage.NewStorage(path+name+"/", func(object object.Object) {
-		table.index(object)
-	}, table.deletedObject, logger, metrics, cacheSize, config.Fields)
+	s, err := storage.NewStorage(
+		path+name+"/",
+		config.Fields,
+		table.addedObject,
+		table.deletedObject,
+		cacheSize,
+		logger,
+		metrics,
+	)
 
 	if err != nil {
 		return nil, err
 	}
-
-	s.AddedObject = table.addedObject
 
 	table.Storage = s
 
@@ -91,7 +98,7 @@ func (t *Table) Delete() error {
 }
 
 func (t *Table) addedObject(object object.Object) {
-	t.updateIndex(object)
+	t.index(object)
 }
 
 func (t *Table) deletedObject(object object.Object) {
@@ -114,7 +121,7 @@ func (t *Table) index(object object.Object) {
 			i, err := t.GetIndex(f.Name)
 
 			if err != nil {
-				panic(err.Error())
+				t.logger.Fatal(err.Error())
 			}
 
 			i.Add(object.M[f.Name], object.Id)
@@ -124,13 +131,13 @@ func (t *Table) index(object object.Object) {
 	n, err := dbtype.NumberFromInt64(object.Id)
 
 	if err != nil {
-		panic(err.Error())
+		t.logger.Fatal(err.Error())
 	}
 
 	i, err := t.GetIndex(field.InternalObjectIdField)
 
 	if err != nil {
-		panic(err.Error())
+		t.logger.Fatal(err.Error())
 	}
 
 	i.Add(n, object.Id)
@@ -142,7 +149,7 @@ func (t *Table) unIndex(object object.Object) {
 			i, err := t.GetIndex(f.Name)
 
 			if err != nil {
-				panic(err.Error())
+				t.logger.Fatal(err.Error())
 			}
 
 			i.Remove(object.M[f.Name], object.Id)
@@ -152,13 +159,13 @@ func (t *Table) unIndex(object object.Object) {
 	i, err := t.GetIndex(field.InternalObjectIdField)
 
 	if err != nil {
-		panic(err.Error())
+		t.logger.Fatal(err.Error())
 	}
 
 	n, err := dbtype.NumberFromInt64(object.Id)
 
 	if err != nil {
-		panic(err.Error())
+		t.logger.Fatal(err.Error())
 	}
 
 	i.Remove(n, object.Id)
@@ -400,26 +407,25 @@ func (t *Table) Insert(objectM map[string]json.RawMessage) error {
 		return insert()
 	}
 
-	o, err := t.JsonRawMapToObject(objectM)
+	m, err := t.JsonRawMapToMapDbType(objectM)
 
 	if err != nil {
 		return err
 	}
 
-	err = t.allFieldsHaveValues(o)
+	err = t.allFieldsHaveValues(m)
 
 	if err != nil {
 		return err
 	}
 
-	err = t.isUnique(o)
+	err = t.isUnique(m)
 
 	if err != nil {
 		return err
 	}
 
-	t.index(*o)
-	t.Storage.AddObject(*o)
+	t.Storage.AddObject(m)
 
 	return nil
 }
@@ -455,25 +461,23 @@ func (t *Table) Update(objectM map[string]json.RawMessage) error {
 		o.M[f.Name] = v
 	}
 
-	err = t.allFieldsHaveValues(o)
+	err = t.allFieldsHaveValues(o.M)
 
 	if err != nil {
 		return err
 	}
 
-	err = t.isUnique(o)
+	err = t.isUnique(o.M)
 
 	if err != nil {
 		return err
 	}
 
-	t.Storage.AddObject(*o)
+	t.Storage.AddObject(o.M)
 
 	if err != nil {
 		return err
 	}
-
-	t.updateIndex(*o)
 
 	return nil
 }
@@ -485,7 +489,6 @@ func (t *Table) Remove(object *object.Object) error {
 		return remove()
 	}
 
-	t.unIndex(*object)
 	t.Storage.DeleteObject(*object)
 
 	return nil
@@ -503,7 +506,7 @@ func (t *Table) FindExisting(object map[string]json.RawMessage) (int64, error) {
 			i, err := t.GetIndex(fieldName)
 
 			if err != nil {
-				panic(err.Error())
+				t.logger.Fatal(err.Error())
 			}
 
 			indexElements := i.Equal(value)
@@ -591,16 +594,16 @@ func (t *Table) SkipAndLimit(objects object.Objects, skip *int64, limit *int64) 
 	return results
 }
 
-func (t *Table) isUnique(o *object.Object) error {
+func (t *Table) isUnique(m map[string]dbtype.DBType) error {
 	for fieldName, f := range t.Config.Fields {
 		if f.Unique && f.Name != field.InternalObjectIdField {
 			i, err := t.GetIndex(fieldName)
 
 			if err != nil {
-				panic(err.Error())
+				t.logger.Fatal(err.Error())
 			}
 
-			if len(i.Equal(o.M[fieldName])) > 0 {
+			if len(i.Equal(m[fieldName])) > 0 {
 				return e.FoundExistingObjectWithField(fieldName)
 			}
 		}
@@ -614,14 +617,14 @@ func (t *Table) isUnique(o *object.Object) error {
 			i, err := t.GetIndex(fieldName)
 
 			if err != nil {
-				panic(err.Error())
+				t.logger.Fatal(err.Error())
 			}
 
 			if first {
-				objects = i.Equal(o.M[fieldName])
+				objects = i.Equal(m[fieldName])
 				first = false
 			} else {
-				objects = t.and(objects, i.Equal(o.M[fieldName]))
+				objects = t.and(objects, i.Equal(m[fieldName]))
 
 				if len(objects) == 0 {
 					break
@@ -637,9 +640,9 @@ func (t *Table) isUnique(o *object.Object) error {
 	return nil
 }
 
-func (t *Table) allFieldsHaveValues(o *object.Object) error {
+func (t *Table) allFieldsHaveValues(m map[string]dbtype.DBType) error {
 	for fieldName, f := range t.Config.Fields {
-		if o.M[fieldName] == nil && !f.Null && f.Name != field.InternalObjectIdField {
+		if m[fieldName] == nil && !f.Null && f.Name != field.InternalObjectIdField {
 			return e.ObjectDoesNotHaveValueForField(fieldName)
 		}
 	}
@@ -771,10 +774,8 @@ func (t *Table) removeDuplicates(o object.Objects) object.Objects {
 	return results
 }
 
-func (t *Table) JsonRawMapToObject(m map[string]json.RawMessage) (*object.Object, error) {
-	o := object.Object{
-		M: map[string]dbtype.DBType{},
-	}
+func (t *Table) JsonRawMapToMapDbType(m map[string]json.RawMessage) (map[string]dbtype.DBType, error) {
+	r := map[string]dbtype.DBType{}
 
 	for _, f := range t.Config.Fields {
 		if f.Name == field.InternalObjectIdField {
@@ -793,10 +794,10 @@ func (t *Table) JsonRawMapToObject(m map[string]json.RawMessage) (*object.Object
 			return nil, err
 		}
 
-		o.M[f.Name] = v
+		r[f.Name] = v
 	}
 
-	return &o, nil
+	return r, nil
 }
 
 func (t *Table) ObjectToJsonRawMap(o object.Object) (map[string]json.RawMessage, error) {

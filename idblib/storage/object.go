@@ -5,8 +5,8 @@
 package storage
 
 type object struct {
-	Id       int64             `json:"id"`
-	Object   map[string]string `json:"object,omitempty"`
-	Deleted  *bool             `json:"deleted"`
-	RefersTo *int64            `json:"refersTo,omitempty"`
+	LineNumber int64             `json:"line_number"`
+	Object     map[string]string `json:"object,omitempty"`
+	RefersTo   *int64            `json:"refersTo,omitempty"`
+	Deleted    *bool             `json:"deleted"`
 }

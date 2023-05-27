@@ -220,8 +220,8 @@ func maxCases(c *client.Client, objects []Data) error {
 	for _, r := range res.Results {
 		m := util.JsonRawMapToInterfaceMap(r)
 
-		if m[fieldNameState] != cases[fieldNameState] {
-			return errors.New(fmt.Sprintf("expected %v, got %v", cases[fieldNameState], m[fieldNameState]))
+		if int64(m[fieldNameMaxCases].(float64)) != cases[m[fieldNameState].(string)] {
+			return errors.New(fmt.Sprintf("expected %v, got %v", cases[m[fieldNameState].(string)], m[fieldNameMaxCases]))
 		}
 	}
 
