@@ -154,7 +154,7 @@ func kill(cmd *exec.Cmd) error {
 
 	log.Println("killed infinitedb-server")
 
-	return nil
+	return cmd.Wait()
 }
 
 func runTests() error {
