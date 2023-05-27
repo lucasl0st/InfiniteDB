@@ -83,6 +83,7 @@ func setup(serverBinary string, coverageOutDir string) (*exec.Cmd, error) {
 		fmt.Sprintf("DATABASE_PATH=%s", dir),
 		fmt.Sprintf("PORT=%v", Port),
 		"AUTHENTICATION=false",
+		"REQUEST_LOGGING=true",
 	}
 
 	stdout, err := cmd.StdoutPipe()
