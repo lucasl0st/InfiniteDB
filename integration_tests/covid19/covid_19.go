@@ -5,37 +5,19 @@
 package covid19
 
 import (
-	"archive/zip"
 	"bufio"
 	"errors"
 	"fmt"
-	"github.com/dimchansky/utfbom"
 	"github.com/lucasl0st/InfiniteDB/client"
 	"github.com/lucasl0st/InfiniteDB/models/request"
 	"github.com/lucasl0st/InfiniteDB/util"
-	"io"
-	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
-	"vimagination.zapto.org/dos2unix"
 )
 
 const covid19GermanyUrl = "https://files.l0stnet.xyz/covid19-germany.zip"
-
 const databaseName = "covid19"
-
-type Data struct {
-	State     string
-	County    string
-	AgeGroup  string
-	Gender    string
-	Date      string
-	Cases     int64
-	Deaths    int64
-	Recovered int64
-}
 
 func Run(c *client.Client) error {
 	f, size, err := download(covid19GermanyUrl)
@@ -62,7 +44,9 @@ func Run(c *client.Client) error {
 		return err
 	}
 
-	defer csvFile.Close()
+	defer func() {
+		err = csvFile.Close()
+	}()
 
 	scanner := bufio.NewScanner(csvFile)
 
@@ -76,42 +60,13 @@ func Run(c *client.Client) error {
 			continue
 		}
 
-		fields := strings.Split(scanner.Text(), ",")
-
-		state := fields[0]
-		county := fields[1]
-		ageGroup := fields[2]
-		gender := fields[3]
-		date := fields[4]
-
-		cases, err := strconv.ParseInt(fields[5], 10, 64)
+		data, err := parseLine(scanner.Text())
 
 		if err != nil {
 			return err
 		}
 
-		deaths, err := strconv.ParseInt(fields[6], 10, 64)
-
-		if err != nil {
-			return err
-		}
-
-		recovered, err := strconv.ParseInt(fields[7], 10, 64)
-
-		if err != nil {
-			return err
-		}
-
-		d = append(d, Data{
-			State:     state,
-			County:    county,
-			AgeGroup:  ageGroup,
-			Gender:    gender,
-			Date:      date,
-			Cases:     cases,
-			Deaths:    deaths,
-			Recovered: recovered,
-		})
+		d = append(d, *data)
 	}
 
 	err = scanner.Err()
@@ -132,7 +87,46 @@ func Run(c *client.Client) error {
 		return err
 	}
 
-	return nil
+	return err
+}
+
+func parseLine(line string) (*Data, error) {
+	fields := strings.Split(line, ",")
+
+	state := fields[0]
+	county := fields[1]
+	ageGroup := fields[2]
+	gender := fields[3]
+	date := fields[4]
+
+	cases, err := strconv.ParseInt(fields[5], 10, 64)
+
+	if err != nil {
+		return nil, err
+	}
+
+	deaths, err := strconv.ParseInt(fields[6], 10, 64)
+
+	if err != nil {
+		return nil, err
+	}
+
+	recovered, err := strconv.ParseInt(fields[7], 10, 64)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &Data{
+		State:     state,
+		County:    county,
+		AgeGroup:  ageGroup,
+		Gender:    gender,
+		Date:      date,
+		Cases:     cases,
+		Deaths:    deaths,
+		Recovered: recovered,
+	}, nil
 }
 
 func createDatabase(c *client.Client) error {
@@ -232,90 +226,4 @@ func maxCases(c *client.Client, objects []Data) error {
 	}
 
 	return nil
-}
-
-func download(url string) (*os.File, int64, error) {
-	f, err := os.CreateTemp("", "covid-19")
-
-	if err != nil {
-		return nil, 0, err
-	}
-
-	c := http.Client{
-		CheckRedirect: func(r *http.Request, via []*http.Request) error {
-			r.URL.Opaque = r.URL.Path
-			return nil
-		},
-	}
-
-	r, err := c.Get(url)
-
-	if err != nil {
-		return nil, 0, err
-	}
-
-	defer r.Body.Close()
-
-	size, err := io.Copy(f, r.Body)
-
-	return f, size, err
-}
-
-func unpack(f *os.File, size int64) (string, error) {
-	d, err := os.MkdirTemp("", "covid-19")
-
-	z, err := zip.NewReader(f, size)
-
-	if err != nil {
-		return d, err
-	}
-
-	for _, f := range z.File {
-		p := filepath.Join(d, f.Name)
-
-		if !strings.HasPrefix(p, filepath.Clean(d)+string(os.PathSeparator)) {
-			return d, errors.New("invalid file path in zip")
-		}
-
-		if f.FileInfo().IsDir() {
-			err = os.MkdirAll(p, os.ModePerm)
-
-			if err != nil {
-				return d, err
-			}
-
-			continue
-		}
-
-		err = os.MkdirAll(filepath.Dir(p), os.ModePerm)
-
-		if err != nil {
-			return "", err
-		}
-
-		df, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-
-		if err != nil {
-			return d, err
-		}
-
-		af, err := f.Open()
-
-		if err != nil {
-			return d, err
-		}
-
-		_, err = io.Copy(df, utfbom.SkipOnly(dos2unix.DOS2Unix(af)))
-
-		if err != nil {
-			return d, err
-		}
-
-		df.Close()
-		af.Close()
-	}
-
-	err = os.Remove(f.Name())
-
-	return d, err
 }

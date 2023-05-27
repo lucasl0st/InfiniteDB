@@ -169,13 +169,13 @@ func runTests() error {
 		return errors.New(fmt.Sprintf("failed to connect to server: %s", err.Error()))
 	}
 
-	for _, test := range test.Tests {
-		log.Printf("running test %s\n", test.Name)
+	for _, t := range test.Tests {
+		log.Printf("running test %s\n", t.Name)
 
-		err := test.Run(c)
+		err = t.Run(c)
 
 		if err != nil {
-			fmt.Printf("test %s failed with error: %s", test.Name, err.Error())
+			fmt.Printf("test %s failed with error: %s", t.Name, err.Error())
 		}
 	}
 
