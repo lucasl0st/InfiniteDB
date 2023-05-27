@@ -93,7 +93,7 @@ func (a *Api) read(ctx *gin.Context, conn *websocket.Conn) {
 		}
 
 		request := infinitedbutil.JsonRawMapToInterfaceMap(body)
-		requestId, ok := request["requestId"].(int64)
+		requestIdFloat, ok := request["requestId"].(float64)
 
 		if !ok {
 			if a.sendError(conn, 0, http.StatusBadRequest, "requestId is not a number") {
@@ -102,6 +102,8 @@ func (a *Api) read(ctx *gin.Context, conn *websocket.Conn) {
 
 			continue
 		}
+
+		requestId := int64(requestIdFloat)
 
 		since := time.Now()
 
