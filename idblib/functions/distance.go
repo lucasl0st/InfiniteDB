@@ -9,7 +9,7 @@ import (
 	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/object"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
-	"github.com/lucasl0st/InfiniteDB/idblib/util"
+	"github.com/lucasl0st/InfiniteDB/util"
 	"math"
 )
 
@@ -46,13 +46,25 @@ func (d *DistanceFunction) Run(
 		if additionalFields[o][d.latitudeFrom] != nil {
 			fromLatitudeValue = additionalFields[o][d.latitudeFrom].(dbtype.Number)
 		} else {
-			fromLatitudeValue = table.Index.GetValue(d.latitudeFrom, o).(dbtype.Number)
+			index, err := table.GetIndex(d.latitudeFrom)
+
+			if err != nil {
+				return nil, nil, err
+			}
+
+			fromLatitudeValue = index.GetValue(o).(dbtype.Number)
 		}
 
 		if additionalFields[o][d.longitudeFrom] != nil {
 			fromLongitudeValue = additionalFields[o][d.longitudeFrom].(dbtype.Number)
 		} else {
-			fromLongitudeValue = table.Index.GetValue(d.longitudeFrom, o).(dbtype.Number)
+			index, err := table.GetIndex(d.longitudeFrom)
+
+			if err != nil {
+				return nil, nil, err
+			}
+
+			fromLongitudeValue = index.GetValue(o).(dbtype.Number)
 		}
 
 		if additionalFields[o] == nil {

@@ -4,12 +4,9 @@ go 1.20
 
 replace github.com/lucasl0st/InfiniteDB => ../../
 
-replace github.com/lucasl0st/InfiniteDB/models => ../../models
-
 require (
 	github.com/jedib0t/go-pretty/v6 v6.4.6
 	github.com/lucasl0st/InfiniteDB v0.0.0-00010101000000-000000000000
-	github.com/lucasl0st/InfiniteDB/models v0.0.0-00010101000000-000000000000
 	github.com/spf13/cobra v1.7.0
 )
 

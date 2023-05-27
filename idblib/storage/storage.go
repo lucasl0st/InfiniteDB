@@ -24,8 +24,8 @@ type Storage struct {
 	c              *cache.Cache
 	writeQueue     []object
 	writeQueueLock sync.Mutex
-	addedObject    func(object idblib.Object)
-	deletedObject  func(object idblib.Object)
+	AddedObject    func(object idblib.Object)
+	DeletedObject  func(object idblib.Object)
 	l              idbutil.Logger
 	write          bool
 	fields         map[string]field.Field
@@ -50,8 +50,8 @@ func NewStorage(
 		file:          file,
 		c:             cache.New(cacheSize),
 		l:             logger,
-		addedObject:   addedObject,
-		deletedObject: deletedObject,
+		AddedObject:   addedObject,
+		DeletedObject: deletedObject,
 		write:         true,
 		fields:        fields,
 	}
@@ -206,10 +206,10 @@ func (s *Storage) addedLine(line string) {
 
 	if storageObject.Deleted != nil && *storageObject.Deleted {
 		o := s.GetObject(*storageObject.RefersTo)
-		s.deletedObject(*o)
+		s.DeletedObject(*o)
 	} else {
 		o := s.storageObjectToObject(storageObject)
-		s.addedObject(o)
+		s.AddedObject(o)
 	}
 }
 

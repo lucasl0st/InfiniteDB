@@ -12,11 +12,12 @@ import (
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
 	"github.com/lucasl0st/InfiniteDB/idblib/util"
 	e "github.com/lucasl0st/InfiniteDB/models/errors"
+	"github.com/lucasl0st/InfiniteDB/server/http"
+	"github.com/lucasl0st/InfiniteDB/server/internal_database"
+	"github.com/lucasl0st/InfiniteDB/server/websocket"
 )
 
 var l util.Logger
-
-const VERSION = "1.0"
 
 type Server struct {
 	c   Config
@@ -31,6 +32,8 @@ func New(
 	shutdown func(),
 ) (*Server, error) {
 	l = logger
+	internal_database.SetLogger(l)
+
 	config, err := LoadConfig()
 
 	if err != nil {
@@ -46,14 +49,14 @@ func New(
 		return nil, err
 	}
 
-	err = SetupInternalDatabase(idb)
+	err = internal_database.SetupInternalDatabase(idb)
 
 	if err != nil {
 		return nil, e.FailedToSetupInternalDatabase(err)
 	}
 
 	if config.Authentication {
-		err = SetupAuthenticationTable(idb)
+		err = internal_database.SetupAuthenticationTable(idb)
 
 		if err != nil {
 			return nil, e.FailedToSetupInternalAuthenticationTable(err)
@@ -64,19 +67,21 @@ func New(
 
 	r := gin.Default()
 
-	httpApi := HttpApi{
-		idb:            idb,
-		authentication: config.Authentication,
-		shutdown:       shutdown,
-	}
+	httpApi := http.New(
+		idb,
+		config.Authentication,
+		shutdown,
+	)
+	
 	httpApi.Run(r)
 
-	websocketApi := WebsocketApi{
-		idb:       idb,
-		logging:   config.RequestLogging,
-		readLimit: config.WebsocketReadLimit,
-		shutdown:  shutdown,
-	}
+	websocketApi := websocket.New(
+		idb,
+		config.RequestLogging,
+		l,
+		config.WebsocketReadLimit,
+		shutdown,
+	)
 	websocketApi.Run(r)
 
 	return &Server{

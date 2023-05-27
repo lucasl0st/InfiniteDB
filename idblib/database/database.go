@@ -18,6 +18,7 @@ import (
 	"github.com/lucasl0st/InfiniteDB/util"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -133,13 +134,27 @@ func (d *Database) loadTables() error {
 		return err
 	}
 
+	errs := make(chan error, len(files))
+	var wg sync.WaitGroup
+
 	for _, tableFolder := range files {
 		if !tableFolder.IsDir() {
 			continue
 		}
 
-		err := d.loadTable(tableFolder.Name())
+		wg.Add(1)
 
+		go func(tableName string) {
+			defer wg.Done()
+
+			errs <- d.loadTable(tableName)
+		}(tableFolder.Name())
+	}
+
+	wg.Wait()
+	close(errs)
+
+	for err = range errs {
 		if err != nil {
 			return err
 		}
@@ -255,8 +270,16 @@ func (d *Database) Get(tableName string, request table.Request) ([]map[string]js
 
 		objects, additionalFields, err := t.Query(*request.Query, nil, make(table.AdditionalFields))
 
+		if err != nil {
+			return nil, err
+		}
+
 		if request.Sort != nil {
 			objects, err = t.Sort(objects, request.Sort.Field, additionalFields, request.Sort.Direction)
+		}
+
+		if err != nil {
+			return nil, err
 		}
 
 		objects = t.SkipAndLimit(objects, request.Skip, request.Limit)

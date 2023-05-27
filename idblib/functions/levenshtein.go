@@ -9,7 +9,7 @@ import (
 	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/object"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
-	"github.com/lucasl0st/InfiniteDB/idblib/util"
+	"github.com/lucasl0st/InfiniteDB/util"
 )
 
 const fieldNameLevenshtein = "levenshtein"
@@ -40,7 +40,13 @@ func (l *LevenshteinFunction) Run(
 		if additionalFields[o][l.fieldName] != nil {
 			str2 = additionalFields[o][l.fieldName].(dbtype.Text)
 		} else {
-			str2 = table.Index.GetValue(l.fieldName, o).(dbtype.Text)
+			index, err := table.GetIndex(l.fieldName)
+
+			if err != nil {
+				return nil, nil, err
+			}
+
+			str2 = index.GetValue(o).(dbtype.Text)
 		}
 
 		if additionalFields[o] == nil {
