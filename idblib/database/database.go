@@ -193,7 +193,7 @@ func (d *Database) loadTable(name string) error {
 
 	elapsed := time.Since(start)
 
-	d.l.Println("loaded table "+name+" with "+fmt.Sprint(t.Storage.NumberOfObjects())+" objects, took ", elapsed)
+	d.l.Println("loaded table "+name+" with "+fmt.Sprint(t.Storage.NumberOfObjects)+" objects, took ", elapsed)
 
 	return nil
 }
@@ -330,13 +330,22 @@ func (d *Database) Remove(tableName string, request table.Request) (int64, error
 	var count int64 = 0
 
 	for _, o := range objects {
-		om, err := t.JsonRawMapToObject(o)
+		id, err := t.FindExisting(o)
 
 		if err != nil {
-			return 0, err
+			return count, err
 		}
 
-		err = t.Remove(om)
+		om, err := t.JsonRawMapToMapDbType(o)
+
+		if err != nil {
+			return count, err
+		}
+
+		err = t.Remove(&object.Object{
+			Id: id,
+			M:  om,
+		})
 
 		if err != nil {
 			return count, err

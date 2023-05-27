@@ -18,6 +18,8 @@ import (
 
 const Port = 8099
 
+var failed = false
+
 func main() {
 	args := os.Args[1:]
 
@@ -44,8 +46,6 @@ func main() {
 	}
 
 	err = runTests()
-
-	failed := false
 
 	if err != nil {
 		fmt.Println(err.Error())
@@ -176,7 +176,8 @@ func runTests() error {
 		err = t.Run(c)
 
 		if err != nil {
-			fmt.Printf("test %s failed with error: %s", t.Name, err.Error())
+			fmt.Printf("test %s failed with error: %s\n", t.Name, err.Error())
+			failed = true
 		}
 	}
 
