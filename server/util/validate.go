@@ -2,14 +2,14 @@
  * Copyright (c) 2023 Lucas Pape
  */
 
-package server
+package util
 
 import (
 	e "github.com/lucasl0st/InfiniteDB/models/errors"
 	"regexp"
 )
 
-func validateName(name string) error {
+func ValidateName(name string) error {
 	r, err := regexp.Compile("^[a-zA-Z\\d-_]+$")
 
 	if err != nil {
