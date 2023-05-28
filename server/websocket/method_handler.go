@@ -6,42 +6,47 @@ package websocket
 
 import (
 	"encoding/json"
+	"github.com/gorilla/websocket"
 	e "github.com/lucasl0st/InfiniteDB/models/errors"
+	"github.com/lucasl0st/InfiniteDB/models/method"
 	models "github.com/lucasl0st/InfiniteDB/models/request"
+	"github.com/lucasl0st/InfiniteDB/models/response"
 	"github.com/lucasl0st/InfiniteDB/server/parse"
 	"github.com/lucasl0st/InfiniteDB/server/util"
 )
 
 var MethodHandlers []MethodHandler
 
-type Handler func(a *Api, request map[string]interface{}, rawRequest map[string]json.RawMessage) (any, error)
+type Handler func(a *Api, conn *websocket.Conn, request map[string]interface{}, rawRequest map[string]json.RawMessage) (any, error)
 
 type MethodHandler struct {
-	Method  Method
+	Method  method.ServerMethod
 	Handler Handler
 }
 
 func init() {
-	registerHandler(ShutdownMethod, shutdownHandler)
-	registerHandler(GetDatabasesMethod, getDatabasesHandler)
-	registerHandler(CreateDatabaseMethod, createDatabaseHandler)
-	registerHandler(DeleteDatabaseMethod, deleteDatabaseHandler)
-	registerHandler(GetDatabaseMethod, getDatabaseHandler)
-	registerHandler(GetDatabaseTableMethod, getDatabaseTableHandler)
-	registerHandler(CreateTableInDatabaseMethod, createTableInDatabaseHandler)
-	registerHandler(DeleteTableInDatabaseMethod, deleteTableInDatabaseHandler)
-	registerHandler(GetFromDatabaseTableMethod, getFromDatabaseTableHandler)
-	registerHandler(InsertToDatabaseTableMethod, insertToDatabaseTableHandler)
-	registerHandler(RemoveFromDatabaseTableMethod, removeFromDatabaseTableHandler)
-	registerHandler(UpdateInDatabaseTableMethod, updateInDatabaseTableHandler)
+	registerHandler(method.ShutdownMethod, shutdownHandler)
+	registerHandler(method.GetDatabasesMethod, getDatabasesHandler)
+	registerHandler(method.CreateDatabaseMethod, createDatabaseHandler)
+	registerHandler(method.DeleteDatabaseMethod, deleteDatabaseHandler)
+	registerHandler(method.GetDatabaseMethod, getDatabaseHandler)
+	registerHandler(method.GetDatabaseTableMethod, getDatabaseTableHandler)
+	registerHandler(method.CreateTableInDatabaseMethod, createTableInDatabaseHandler)
+	registerHandler(method.DeleteTableInDatabaseMethod, deleteTableInDatabaseHandler)
+	registerHandler(method.GetFromDatabaseTableMethod, getFromDatabaseTableHandler)
+	registerHandler(method.InsertToDatabaseTableMethod, insertToDatabaseTableHandler)
+	registerHandler(method.RemoveFromDatabaseTableMethod, removeFromDatabaseTableHandler)
+	registerHandler(method.UpdateInDatabaseTableMethod, updateInDatabaseTableHandler)
+	registerHandler(method.SubscribeToMetricUpdates, subscribeToMetricUpdates)
+	registerHandler(method.UnsubscribeFromMetricUpdates, unsubscribeFromMetricUpdates)
 }
 
-func registerHandler(method Method, handler Handler) {
+func registerHandler(m method.ServerMethod, handler Handler) {
 	MethodHandlers = append(MethodHandlers, struct {
-		Method  Method
+		Method  method.ServerMethod
 		Handler Handler
 	}{
-		Method:  method,
+		Method:  m,
 		Handler: handler,
 	})
 }
@@ -70,16 +75,16 @@ func getTableName(request map[string]interface{}) (string, error) {
 	return getString(request, "tableName")
 }
 
-func shutdownHandler(a *Api, _ map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
+func shutdownHandler(a *Api, _ *websocket.Conn, _ map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
 	a.shutdown()
 	return nil, nil
 }
 
-func getDatabasesHandler(a *Api, _ map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
+func getDatabasesHandler(a *Api, _ *websocket.Conn, _ map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
 	return a.idb.GetDatabases()
 }
 
-func createDatabaseHandler(a *Api, request map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
+func createDatabaseHandler(a *Api, _ *websocket.Conn, request map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
 	name, err := getDatabaseName(request)
 
 	if err != nil {
@@ -89,7 +94,7 @@ func createDatabaseHandler(a *Api, request map[string]interface{}, _ map[string]
 	return a.idb.CreateDatabase(name)
 }
 
-func deleteDatabaseHandler(a *Api, request map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
+func deleteDatabaseHandler(a *Api, _ *websocket.Conn, request map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
 	name, err := getDatabaseName(request)
 
 	if err != nil {
@@ -99,7 +104,7 @@ func deleteDatabaseHandler(a *Api, request map[string]interface{}, _ map[string]
 	return a.idb.DeleteDatabase(name)
 }
 
-func getDatabaseHandler(a *Api, request map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
+func getDatabaseHandler(a *Api, _ *websocket.Conn, request map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
 	name, err := getDatabaseName(request)
 
 	if err != nil {
@@ -109,7 +114,7 @@ func getDatabaseHandler(a *Api, request map[string]interface{}, _ map[string]jso
 	return a.idb.GetDatabase(name)
 }
 
-func getDatabaseTableHandler(a *Api, request map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
+func getDatabaseTableHandler(a *Api, _ *websocket.Conn, request map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
 	name, err := getDatabaseName(request)
 
 	if err != nil {
@@ -125,7 +130,7 @@ func getDatabaseTableHandler(a *Api, request map[string]interface{}, _ map[strin
 	return a.idb.GetDatabaseTable(name, tableName)
 }
 
-func createTableInDatabaseHandler(a *Api, request map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
+func createTableInDatabaseHandler(a *Api, _ *websocket.Conn, request map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
 	name, err := getDatabaseName(request)
 
 	if err != nil {
@@ -174,7 +179,7 @@ func createTableInDatabaseHandler(a *Api, request map[string]interface{}, _ map[
 	return a.idb.CreateTableInDatabase(name, tableName, parsedFields, o)
 }
 
-func deleteTableInDatabaseHandler(a *Api, request map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
+func deleteTableInDatabaseHandler(a *Api, _ *websocket.Conn, request map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
 	name, err := getDatabaseName(request)
 
 	if err != nil {
@@ -190,7 +195,7 @@ func deleteTableInDatabaseHandler(a *Api, request map[string]interface{}, _ map[
 	return a.idb.DeleteTableInDatabase(name, tableName)
 }
 
-func getFromDatabaseTableHandler(a *Api, request map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
+func getFromDatabaseTableHandler(a *Api, _ *websocket.Conn, request map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
 	name, err := getDatabaseName(request)
 
 	if err != nil {
@@ -219,7 +224,7 @@ func getFromDatabaseTableHandler(a *Api, request map[string]interface{}, _ map[s
 	return a.idb.GetFromDatabaseTable(name, tableName, *parsedRequest)
 }
 
-func insertToDatabaseTableHandler(a *Api, request map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
+func insertToDatabaseTableHandler(a *Api, _ *websocket.Conn, request map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
 	name, err := getDatabaseName(request)
 
 	if err != nil {
@@ -242,7 +247,7 @@ func insertToDatabaseTableHandler(a *Api, request map[string]interface{}, _ map[
 	return a.idb.InsertToDatabaseTable(name, tableName, o)
 }
 
-func removeFromDatabaseTableHandler(a *Api, request map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
+func removeFromDatabaseTableHandler(a *Api, _ *websocket.Conn, request map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
 	name, err := getDatabaseName(request)
 
 	if err != nil {
@@ -271,7 +276,7 @@ func removeFromDatabaseTableHandler(a *Api, request map[string]interface{}, _ ma
 	return a.idb.RemoveFromDatabaseTable(name, tableName, *parsedRequest)
 }
 
-func updateInDatabaseTableHandler(a *Api, request map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
+func updateInDatabaseTableHandler(a *Api, _ *websocket.Conn, request map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
 	name, err := getDatabaseName(request)
 
 	if err != nil {
@@ -292,4 +297,24 @@ func updateInDatabaseTableHandler(a *Api, request map[string]interface{}, _ map[
 	}
 
 	return a.idb.UpdateInDatabaseTable(name, tableName, o)
+}
+
+func subscribeToMetricUpdates(a *Api, conn *websocket.Conn, _ map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
+	a.subscribedToMetricUpdates = append(a.subscribedToMetricUpdates, conn)
+
+	return response.SubscribeToMetricUpdatesResponse{}, nil
+}
+
+func unsubscribeFromMetricUpdates(a *Api, conn *websocket.Conn, _ map[string]interface{}, _ map[string]json.RawMessage) (any, error) {
+	removedSubscribed := a.subscribedToMetricUpdates
+
+	for _, subscribedConn := range a.subscribedToMetricUpdates {
+		if subscribedConn != conn {
+			removedSubscribed = append(removedSubscribed, subscribedConn)
+		}
+	}
+
+	a.subscribedToMetricUpdates = removedSubscribed
+
+	return response.UnsubscribedFromMetricUpdatesResponse{}, nil
 }

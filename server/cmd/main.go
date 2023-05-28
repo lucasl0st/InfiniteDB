@@ -5,7 +5,6 @@
 package main
 
 import (
-	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
 	"github.com/lucasl0st/InfiniteDB/server"
 	"github.com/lucasl0st/InfiniteDB/server/util"
 	"log"
@@ -18,12 +17,10 @@ var s *server.Server
 
 func main() {
 	var err error
-	var metricsReceiver metrics.Receiver = &util.MetricsReceiver{}
 
 	s, err = server.New(
 		util.LoggerWithPrefix{Prefix: "[InfiniteDB]"},
 		util.LoggerWithPrefix{Prefix: "[idblib]"},
-		&metricsReceiver,
 		shutdown,
 	)
 

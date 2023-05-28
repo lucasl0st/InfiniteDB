@@ -10,7 +10,6 @@ import (
 	"github.com/lucasl0st/InfiniteDB/idblib/cache"
 	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
-	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
 	idblib "github.com/lucasl0st/InfiniteDB/idblib/object"
 	idbutil "github.com/lucasl0st/InfiniteDB/idblib/util"
 	"github.com/lucasl0st/InfiniteDB/util"
@@ -29,8 +28,10 @@ type Storage struct {
 
 	NumberOfObjects int64
 
-	logger  idbutil.Logger
-	metrics *metrics.Metrics
+	logger idbutil.Logger
+
+	metricAddTotalObject func()
+	metricWroteObject    func()
 }
 
 func NewStorage(
@@ -40,15 +41,17 @@ func NewStorage(
 	deletedObject func(object idblib.Object),
 	cacheSize uint,
 	logger idbutil.Logger,
-	metrics *metrics.Metrics,
+	metricAddTotalObject func(),
+	metricWroteObject func(),
 ) (*Storage, error) {
 	s := &Storage{
-		c:             cache.New(cacheSize),
-		fields:        fields,
-		addedObject:   addedObject,
-		deletedObject: deletedObject,
-		logger:        logger,
-		metrics:       metrics,
+		c:                    cache.New(cacheSize),
+		fields:               fields,
+		addedObject:          addedObject,
+		deletedObject:        deletedObject,
+		logger:               logger,
+		metricAddTotalObject: metricAddTotalObject,
+		metricWroteObject:    metricWroteObject,
 	}
 
 	file, err := New(path+objectsFileName, s.addedLineInFile, logger)
@@ -87,7 +90,7 @@ func (s *Storage) addedLineInFile(line string) {
 		s.DeleteObject(*o)
 	} else {
 		s.NumberOfObjects++
-		s.metrics.AddTotalObject()
+		s.metricAddTotalObject()
 	}
 
 	s.addedObject(s.storageObjectToObject(storageObject))
@@ -183,7 +186,7 @@ func (s *Storage) writeObjects(objects []object) {
 			s.logger.Fatal(err.Error())
 		}
 
-		s.metrics.WroteObject()
+		s.metricWroteObject()
 
 		s.c.Remove(object.LineNumber)
 

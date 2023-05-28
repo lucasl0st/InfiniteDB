@@ -11,6 +11,7 @@ require (
 )
 
 require (
+	github.com/buger/goterm v1.0.4 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/compress v1.10.3 // indirect

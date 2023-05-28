@@ -71,7 +71,12 @@ func NewTable(
 		table.deletedObject,
 		cacheSize,
 		logger,
-		metrics,
+		func() {
+			metrics.AddTotalObject(databaseName, table.Name)
+		},
+		func() {
+			metrics.WroteObject(databaseName, table.Name)
+		},
 	)
 
 	if err != nil {

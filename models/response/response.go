@@ -70,3 +70,14 @@ type UpdateInDatabaseTableResponse struct {
 	TableName string                     `json:"tableName"`
 	Object    map[string]json.RawMessage `json:"object"`
 }
+
+type SubscribeToMetricUpdatesResponse struct {
+}
+
+type UnsubscribedFromMetricUpdatesResponse struct {
+}
+
+type MetricUpdateResponse struct {
+	Metric string `json:"metric"`
+	Value  any    `json:"value"`
+}

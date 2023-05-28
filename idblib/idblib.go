@@ -17,6 +17,7 @@ import (
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
 	"github.com/lucasl0st/InfiniteDB/idblib/util"
 	e "github.com/lucasl0st/InfiniteDB/models/errors"
+	"github.com/lucasl0st/InfiniteDB/models/metric"
 	"github.com/lucasl0st/InfiniteDB/models/request"
 	"github.com/lucasl0st/InfiniteDB/models/response"
 	"os"
@@ -37,7 +38,7 @@ type IDB struct {
 	workerPool     *workerpool.WorkerPool
 }
 
-func New(databasePath string, logger util.Logger, metricsReceiver *metrics.Receiver, cacheSize uint) (*IDB, error) {
+func New(databasePath string, logger util.Logger, metricsReceiver *metric.Receiver, cacheSize uint) (*IDB, error) {
 	if _, err := os.Stat(databasePath); errors.Is(err, os.ErrNotExist) {
 		err := os.MkdirAll(databasePath, os.ModePerm)
 
@@ -330,6 +331,8 @@ func (i *IDB) GetFromDatabaseTable(name string, tableName string, request table.
 		return response.GetFromDatabaseTableResponse{}, e.DatabaseDoesNotExist()
 	}
 
+	start := time.Now()
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 
@@ -356,6 +359,9 @@ func (i *IDB) GetFromDatabaseTable(name string, tableName string, request table.
 		return response.GetFromDatabaseTableResponse{}, err
 	}
 
+	elapsed := time.Since(start)
+	i.m.GetTime(elapsed)
+
 	return response.GetFromDatabaseTableResponse{
 		Name:      name,
 		TableName: tableName,
@@ -369,6 +375,8 @@ func (i *IDB) InsertToDatabaseTable(name string, tableName string, object map[st
 	if d == nil {
 		return response.InsertToDatabaseTableResponse{}, e.DatabaseDoesNotExist()
 	}
+
+	start := time.Now()
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -390,6 +398,9 @@ func (i *IDB) InsertToDatabaseTable(name string, tableName string, object map[st
 	if err != nil {
 		return response.InsertToDatabaseTableResponse{}, err
 	}
+
+	elapsed := time.Since(start)
+	i.m.InsertTime(elapsed)
 
 	return response.InsertToDatabaseTableResponse{
 		Name:      name,
