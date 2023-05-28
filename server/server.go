@@ -8,12 +8,13 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/lucasl0st/InfiniteDB/idblib"
-	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
 	"github.com/lucasl0st/InfiniteDB/idblib/table"
 	"github.com/lucasl0st/InfiniteDB/idblib/util"
 	e "github.com/lucasl0st/InfiniteDB/models/errors"
+	"github.com/lucasl0st/InfiniteDB/models/metric"
 	"github.com/lucasl0st/InfiniteDB/server/http"
 	"github.com/lucasl0st/InfiniteDB/server/internal_database"
+	serverutil "github.com/lucasl0st/InfiniteDB/server/util"
 	"github.com/lucasl0st/InfiniteDB/server/websocket"
 )
 
@@ -23,12 +24,13 @@ type Server struct {
 	c   Config
 	idb *idblib.IDB
 	r   *gin.Engine
+
+	websocketApi *websocket.Api
 }
 
 func New(
 	logger util.Logger,
 	idbLogger util.Logger,
-	metricsReceiver *metrics.Receiver,
 	shutdown func(),
 ) (*Server, error) {
 	l = logger
@@ -43,7 +45,13 @@ func New(
 	l.Println("using database path: " + config.DatabasePath)
 	l.Println("authentication enabled: " + fmt.Sprint(config.Authentication))
 
-	idb, err := idblib.New(config.DatabasePath, idbLogger, metricsReceiver, config.CacheSize)
+	s := &Server{}
+
+	var metricsReceiver metric.Receiver = &serverutil.MetricsReceiver{
+		SubmitMetric: s.submitMetric,
+	}
+
+	idb, err := idblib.New(config.DatabasePath, idbLogger, &metricsReceiver, config.CacheSize)
 
 	if err != nil {
 		return nil, err
@@ -72,7 +80,7 @@ func New(
 		config.Authentication,
 		shutdown,
 	)
-	
+
 	httpApi.Run(r)
 
 	websocketApi := websocket.New(
@@ -84,11 +92,12 @@ func New(
 	)
 	websocketApi.Run(r)
 
-	return &Server{
-		c:   *config,
-		idb: idb,
-		r:   r,
-	}, nil
+	s.c = *config
+	s.idb = idb
+	s.r = r
+	s.websocketApi = websocketApi
+
+	return s, nil
 }
 
 func (s *Server) Run() error {
@@ -105,4 +114,8 @@ func (s *Server) Run() error {
 
 func (s *Server) Kill() {
 	s.idb.Kill()
+}
+
+func (s *Server) submitMetric(metric metric.Metric, value any) {
+	s.websocketApi.SubmitMetricUpdate(metric, value)
 }

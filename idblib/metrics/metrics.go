@@ -5,24 +5,29 @@
 package metrics
 
 import (
+	"github.com/lucasl0st/InfiniteDB/models/metric"
+	"sync"
 	"time"
 )
 
 type Metrics struct {
-	lastReportedTotalObjects int64
+	databasesLock sync.RWMutex
+	databases     map[string]metric.DatabaseMetrics
 
-	insertedObjects int64
-	totalObjects    int64
+	getTimeAverage time.Duration
+	getTime        time.Duration
+	getTimeAmount  int64
 
-	r *Receiver
+	insertTimeAverage time.Duration
+	insertTime        time.Duration
+	insertTimeAmount  int64
+
+	r *metric.Receiver
 }
 
-func New(receiver *Receiver) *Metrics {
+func New(receiver *metric.Receiver) *Metrics {
 	m := Metrics{
-		lastReportedTotalObjects: 0,
-
-		insertedObjects: 0,
-		totalObjects:    0,
+		databases: map[string]metric.DatabaseMetrics{},
 
 		r: receiver,
 	}
@@ -38,29 +43,90 @@ func New(receiver *Receiver) *Metrics {
 	return &m
 }
 
-func (m *Metrics) WroteObject() {
-	m.insertedObjects += 1
+func (m *Metrics) createMetrics(database string, table string) {
+	m.databasesLock.Lock()
+	defer m.databasesLock.Unlock()
+
+	_, ok := m.databases[database]
+
+	if !ok {
+		m.databases[database] = metric.DatabaseMetrics{Tables: map[string]metric.TableMetrics{}}
+	}
+
+	_, ok = m.databases[database].Tables[table]
+
+	if !ok {
+		m.databases[database].Tables[table] = metric.TableMetrics{
+			InsertedObjects: 0,
+			TotalObjects:    0,
+		}
+	}
 }
 
-func (m *Metrics) AddTotalObject() {
-	m.totalObjects += 1
+func (m *Metrics) WroteObject(database string, table string) {
+	m.createMetrics(database, table)
+
+	m.databasesLock.Lock()
+	defer m.databasesLock.Unlock()
+
+	tableMetric := m.databases[database].Tables[table]
+	tableMetric.InsertedObjects += 1
+	m.databases[database].Tables[table] = tableMetric
+}
+
+func (m *Metrics) AddTotalObject(database string, table string) {
+	m.createMetrics(database, table)
+
+	m.databasesLock.Lock()
+	defer m.databasesLock.Unlock()
+
+	tableMetric := m.databases[database].Tables[table]
+	tableMetric.TotalObjects += 1
+	m.databases[database].Tables[table] = tableMetric
+}
+
+func (m *Metrics) InsertTime(time time.Duration) {
+	m.insertTime += time
+	m.insertTimeAmount++
+}
+
+func (m *Metrics) GetTime(time time.Duration) {
+	m.getTime += time
+	m.getTimeAmount++
 }
 
 func (m *Metrics) runner() {
-	objectsPerSecond := m.insertedObjects
-	m.insertedObjects = 0
+	m.databasesLock.Lock()
+	defer m.databasesLock.Unlock()
 
-	if objectsPerSecond != 0 {
-		if m.r != nil {
-			(*m.r).ObjectsInsertedPerSecond(objectsPerSecond)
+	for database, databaseMetrics := range m.databases {
+		(*m.r).DatabaseMetrics(database, databaseMetrics)
+
+		for table, tableMetrics := range databaseMetrics.Tables {
+			tableMetrics.InsertedObjects = 0
+
+			databaseMetrics.Tables[table] = tableMetrics
 		}
+
+		m.databases[database] = databaseMetrics
 	}
 
-	if m.lastReportedTotalObjects != m.totalObjects {
-		m.lastReportedTotalObjects = m.totalObjects
-
-		if m.r != nil {
-			(*m.r).TotalObjects(m.totalObjects)
-		}
+	if m.insertTimeAmount != 0 {
+		m.insertTimeAverage = time.Duration(m.insertTime.Nanoseconds() / m.insertTimeAmount)
 	}
+
+	m.insertTime = 0
+	m.insertTimeAmount = 0
+
+	if m.getTimeAmount != 0 {
+		m.getTimeAverage = time.Duration(m.getTime.Nanoseconds() / m.getTimeAmount)
+	}
+
+	m.getTime = 0
+	m.getTimeAmount = 0
+
+	(*m.r).PerformanceMetrics(metric.PerformanceMetrics{
+		AverageObjectInsertTime: m.insertTimeAverage,
+		AverageObjectGetTime:    m.getTimeAverage,
+	})
 }

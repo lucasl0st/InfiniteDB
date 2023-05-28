@@ -4,11 +4,19 @@
 
 package util
 
+import "github.com/lucasl0st/InfiniteDB/models/metric"
+
 type MetricsReceiver struct {
+	SubmitMetric func(metric metric.Metric, value any)
 }
 
-func (m *MetricsReceiver) ObjectsInsertedPerSecond(v int64) {
+func (r *MetricsReceiver) DatabaseMetrics(database string, m metric.DatabaseMetrics) {
+	r.SubmitMetric(metric.DatabaseMetric, metric.DatabaseMetricResponse{
+		Database: database,
+		Metrics:  m,
+	})
 }
 
-func (m *MetricsReceiver) TotalObjects(v int64) {
+func (r *MetricsReceiver) PerformanceMetrics(m metric.PerformanceMetrics) {
+	r.SubmitMetric(metric.PerformanceMetric, metric.PerformanceMetricResponse{Metrics: m})
 }

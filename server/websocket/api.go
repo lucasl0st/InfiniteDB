@@ -12,6 +12,9 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/lucasl0st/InfiniteDB/idblib"
 	idbutil "github.com/lucasl0st/InfiniteDB/idblib/util"
+	"github.com/lucasl0st/InfiniteDB/models/method"
+	"github.com/lucasl0st/InfiniteDB/models/metric"
+	models "github.com/lucasl0st/InfiniteDB/models/response"
 	"github.com/lucasl0st/InfiniteDB/server/util"
 	infinitedbutil "github.com/lucasl0st/InfiniteDB/util"
 	"net/http"
@@ -24,11 +27,16 @@ var wsUpgrader = websocket.Upgrader{
 }
 
 type Api struct {
-	idb       *idblib.IDB
-	logging   bool
-	l         idbutil.Logger
+	idb *idblib.IDB
+
+	logging bool
+	l       idbutil.Logger
+
+	subscribedToMetricUpdates []*websocket.Conn
+
 	readLimit int64
-	shutdown  func()
+
+	shutdown func()
 }
 
 func New(idb *idblib.IDB, logging bool, logger idbutil.Logger, readLimit int64, shutdown func()) *Api {
@@ -61,10 +69,11 @@ func (a *Api) handler(ctx *gin.Context, rw http.ResponseWriter, r *http.Request)
 
 	conn.SetReadLimit(a.readLimit)
 
-	a.sendResponse(conn, 0, infinitedbutil.InterfaceMapToJsonRawMap(gin.H{
+	a.send(conn, infinitedbutil.InterfaceMapToJsonRawMap(gin.H{
 		"message":          "HELO",
 		"status":           http.StatusOK,
 		"database_version": util.SERVER_VERSION,
+		"method":           method.HeloMethod,
 	}))
 
 	a.read(ctx, conn)
@@ -75,7 +84,7 @@ func (a *Api) read(ctx *gin.Context, conn *websocket.Conn) {
 		_, bytes, err := conn.ReadMessage()
 
 		if err != nil {
-			if a.sendError(conn, 0, http.StatusInternalServerError, "failed to read message") {
+			if a.sendGenericError(conn, http.StatusInternalServerError, "failed to read message") {
 				return
 			}
 
@@ -85,7 +94,7 @@ func (a *Api) read(ctx *gin.Context, conn *websocket.Conn) {
 		body, err := a.parseBody(bytes)
 
 		if err != nil {
-			if a.sendError(conn, 0, http.StatusBadRequest, err.Error()) {
+			if a.sendGenericError(conn, http.StatusBadRequest, err.Error()) {
 				return
 			}
 
@@ -96,7 +105,7 @@ func (a *Api) read(ctx *gin.Context, conn *websocket.Conn) {
 		requestIdFloat, ok := request["requestId"].(float64)
 
 		if !ok {
-			if a.sendError(conn, 0, http.StatusBadRequest, "requestId is not a number") {
+			if a.sendGenericError(conn, http.StatusBadRequest, "requestId is not a number") {
 				return
 			}
 
@@ -107,40 +116,32 @@ func (a *Api) read(ctx *gin.Context, conn *websocket.Conn) {
 
 		since := time.Now()
 
-		response, method, err := a.handleRequest(request, body)
+		response, m, err := a.handleRequest(conn, request, body)
 
 		if err != nil {
-			if a.logging && method != nil {
-				a.log(*method, http.StatusInternalServerError, since, ctx.ClientIP(), requestId)
+			if a.logging && m != nil {
+				a.log(*m, http.StatusInternalServerError, since, ctx.ClientIP(), requestId)
 			}
 
-			if a.sendError(conn, requestId, http.StatusInternalServerError, err.Error()) {
+			if a.sendRequestError(conn, requestId, http.StatusInternalServerError, err.Error()) {
 				return
 			}
 
 			continue
 		}
 
-		if a.logging && method != nil {
-			a.log(*method, http.StatusOK, since, ctx.ClientIP(), requestId)
+		if a.logging && m != nil {
+			a.log(*m, http.StatusOK, since, ctx.ClientIP(), requestId)
 		}
 
-		if a.sendResponse(conn, requestId, response) {
+		if a.sendRequestResponse(conn, requestId, response) {
 			return
 		}
 	}
 }
 
-func (a *Api) sendResponse(conn *websocket.Conn, requestId int64, m map[string]json.RawMessage) bool {
-	m["requestId"] = infinitedbutil.Int64ToJsonRaw(requestId)
-
-	_, ok := m["status"]
-
-	if !ok {
-		m["status"] = infinitedbutil.InterfaceToJsonRaw(http.StatusOK)
-	}
-
-	err := conn.WriteJSON(m)
+func (a *Api) send(conn *websocket.Conn, msg any) bool {
+	err := conn.WriteJSON(msg)
 
 	if err != nil {
 		a.l.Println(err)
@@ -156,13 +157,36 @@ func (a *Api) sendResponse(conn *websocket.Conn, requestId int64, m map[string]j
 	return false
 }
 
-func (a *Api) sendError(conn *websocket.Conn, requestId int64, status int, message string) bool {
+func (a *Api) sendRequestResponse(conn *websocket.Conn, requestId int64, m map[string]json.RawMessage) bool {
+	m["method"] = infinitedbutil.StringToJsonRaw(fmt.Sprint(method.RequestResponseMethod))
+	m["requestId"] = infinitedbutil.Int64ToJsonRaw(requestId)
+
+	_, ok := m["status"]
+
+	if !ok {
+		m["status"] = infinitedbutil.InterfaceToJsonRaw(http.StatusOK)
+	}
+
+	return a.send(conn, m)
+}
+
+func (a *Api) sendRequestError(conn *websocket.Conn, requestId int64, status int, message string) bool {
 	m := infinitedbutil.InterfaceMapToJsonRawMap(gin.H{
 		"status":  status,
 		"message": message,
 	})
 
-	return a.sendResponse(conn, requestId, m)
+	return a.sendRequestResponse(conn, requestId, m)
+}
+
+func (a *Api) sendGenericError(conn *websocket.Conn, status int, message string) bool {
+	m := infinitedbutil.InterfaceMapToJsonRawMap(gin.H{
+		"method":  method.GenericErrorMethod,
+		"status":  status,
+		"message": message,
+	})
+
+	return a.send(conn, m)
 }
 
 func (a *Api) parseBody(bytes []byte) (map[string]json.RawMessage, error) {
@@ -176,16 +200,16 @@ func (a *Api) parseBody(bytes []byte) (map[string]json.RawMessage, error) {
 	return body, nil
 }
 
-func (a *Api) handleRequest(request map[string]interface{}, rawRequest map[string]json.RawMessage) (map[string]json.RawMessage, *Method, error) {
-	method, ok := request["method"].(string)
+func (a *Api) handleRequest(conn *websocket.Conn, request map[string]interface{}, rawRequest map[string]json.RawMessage) (map[string]json.RawMessage, *method.ServerMethod, error) {
+	m, ok := request["method"].(string)
 
 	if !ok {
 		return nil, nil, errors.New("method is not a string")
 	}
 
 	for _, handler := range MethodHandlers {
-		if string(handler.Method) == method {
-			results, err := handler.Handler(a, request, rawRequest)
+		if string(handler.Method) == m {
+			results, err := handler.Handler(a, conn, request, rawRequest)
 
 			if err != nil {
 				return nil, &handler.Method, err
@@ -204,7 +228,7 @@ func (a *Api) handleRequest(request map[string]interface{}, rawRequest map[strin
 	return nil, nil, errors.New("method not found")
 }
 
-func (a *Api) log(method Method, statusCode int, since time.Time, clientIp string, requestId int64) {
+func (a *Api) log(method method.ServerMethod, statusCode int, since time.Time, clientIp string, requestId int64) {
 	param := new(gin.LogFormatterParams)
 	param.Path = fmt.Sprint(method)
 	param.Method = http.MethodGet
@@ -233,4 +257,25 @@ func (a *Api) log(method Method, statusCode int, since time.Time, clientIp strin
 		param.Path,
 		param.ErrorMessage,
 	))
+}
+
+func (a *Api) SubmitMetricUpdate(metric metric.Metric, value any) {
+	if a == nil {
+		return
+	}
+
+	response, err := util.ToMap(models.MetricUpdateResponse{
+		Metric: fmt.Sprint(metric),
+		Value:  value,
+	})
+
+	if err != nil {
+		a.l.Fatal(err.Error())
+	}
+
+	for _, conn := range a.subscribedToMetricUpdates {
+		response["method"] = infinitedbutil.StringToJsonRaw(fmt.Sprint(method.MetricsUpdateMethod))
+
+		a.send(conn, response)
+	}
 }
