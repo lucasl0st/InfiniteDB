@@ -273,9 +273,32 @@ func (a *Api) SubmitMetricUpdate(metric metric.Metric, value any) {
 		a.l.Fatal(err.Error())
 	}
 
+	var closed []*websocket.Conn
+
 	for _, conn := range a.subscribedToMetricUpdates {
 		response["method"] = infinitedbutil.StringToJsonRaw(fmt.Sprint(method.MetricsUpdateMethod))
 
-		a.send(conn, response)
+		if a.send(conn, response) {
+			closed = append(closed, conn)
+		}
 	}
+
+	var notClosed []*websocket.Conn
+
+	for _, conn := range a.subscribedToMetricUpdates {
+		connClosed := false
+
+		for _, closedConn := range closed {
+			if closedConn == conn {
+				connClosed = true
+				break
+			}
+		}
+
+		if !connClosed {
+			notClosed = append(notClosed, conn)
+		}
+	}
+
+	a.subscribedToMetricUpdates = notClosed
 }
