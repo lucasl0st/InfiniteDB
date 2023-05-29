@@ -7,6 +7,7 @@ package storage
 import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/lucasl0st/InfiniteDB/idblib/file"
+	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
 	idbutil "github.com/lucasl0st/InfiniteDB/idblib/util"
 )
 
@@ -68,6 +69,9 @@ func New(path string, addedLine func(line string), logger idbutil.Logger) (*Shar
 }
 
 func (s *SharedFile) Write(objects []object, getLine func(object object, lineNumber int64) string) error {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	err := s.Lock.Lock()
 
 	if err != nil {
@@ -101,6 +105,9 @@ func (s *SharedFile) Write(objects []object, getLine func(object object, lineNum
 }
 
 func (s *SharedFile) Read(lineNumbers []int64) ([]string, error) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	return s.file.Read(lineNumbers)
 }
 

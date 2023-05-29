@@ -108,7 +108,7 @@ func renderDatabaseMetrics() {
 
 	t.AppendHeader(table.Row{"Database", "Table", "Objects Inserted Per Second", "Total Objects"})
 
-	var values []struct {
+	var rows []struct {
 		database                 string
 		table                    string
 		objectsInsertedPerSecond int64
@@ -117,7 +117,7 @@ func renderDatabaseMetrics() {
 
 	for database, databaseMetric := range databaseMetrics {
 		for tableName, tableMetric := range databaseMetric.Tables {
-			values = append(values, struct {
+			rows = append(rows, struct {
 				database                 string
 				table                    string
 				objectsInsertedPerSecond int64
@@ -131,16 +131,16 @@ func renderDatabaseMetrics() {
 		}
 	}
 
-	sort.Slice(values, func(i, j int) bool {
-		return values[i].totalObjects > values[j].totalObjects
+	sort.Slice(rows, func(i, j int) bool {
+		return rows[i].totalObjects > rows[j].totalObjects
 	})
 
-	for _, value := range values {
+	for _, row := range rows {
 		t.AppendRow(table.Row{
-			value.database,
-			value.table,
-			value.objectsInsertedPerSecond,
-			value.totalObjects,
+			row.database,
+			row.table,
+			row.objectsInsertedPerSecond,
+			row.totalObjects,
 		})
 	}
 
@@ -151,11 +151,30 @@ func renderPerformanceMetrics() {
 	t := table.NewWriter()
 	t.SetOutputMirror(tm.Output)
 
-	t.AppendHeader(table.Row{"Average Insert Time", "Average Get Time"})
-	t.AppendRow(table.Row{
-		fmt.Sprint(performanceMetrics.AverageObjectInsertTime),
-		fmt.Sprint(performanceMetrics.AverageObjectGetTime),
+	t.AppendHeader(table.Row{"Function Name", "Average Call Time"})
+
+	var rows []struct {
+		functionName    string
+		averageCallTime time.Duration
+	}
+
+	for function, performanceMetric := range performanceMetrics.Functions {
+		rows = append(rows, struct {
+			functionName    string
+			averageCallTime time.Duration
+		}{functionName: function, averageCallTime: performanceMetric.AverageFunctionCallDuration})
+	}
+
+	sort.Slice(rows, func(i, j int) bool {
+		return rows[i].averageCallTime > rows[j].averageCallTime
 	})
+
+	for _, row := range rows {
+		t.AppendRow(table.Row{
+			row.functionName,
+			fmt.Sprint(row.averageCallTime),
+		})
+	}
 
 	t.Render()
 }

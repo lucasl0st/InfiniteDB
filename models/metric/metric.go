@@ -16,8 +16,11 @@ type DatabaseMetrics struct {
 }
 
 type PerformanceMetrics struct {
-	AverageObjectInsertTime time.Duration `json:"averageInsertTime"`
-	AverageObjectGetTime    time.Duration `json:"averageObjectGetTime"`
+	Functions map[string]FunctionMetrics `json:"functions"`
+}
+
+type FunctionMetrics struct {
+	AverageFunctionCallDuration time.Duration `json:"averageFunctionCallDuration"`
 }
 
 type TableMetrics struct {

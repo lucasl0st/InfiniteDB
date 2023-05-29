@@ -6,6 +6,7 @@ package file
 
 import (
 	"bufio"
+	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
 	"os"
 	"sort"
 )
@@ -35,6 +36,9 @@ func New(path string) (*File, error) {
 }
 
 func (f *File) Append(lines []string) error {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	file, err := openWritableFile(f.path)
 
 	if err != nil {
@@ -57,6 +61,9 @@ func (f *File) Append(lines []string) error {
 }
 
 func (f *File) Read(lineNumbers []int64) ([]string, error) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	if len(lineNumbers) == 0 {
 		return nil, nil
 	}
@@ -113,6 +120,9 @@ func (f *File) Read(lineNumbers []int64) ([]string, error) {
 }
 
 func (f *File) ReadAtStartLine(start int64, readLine func(line string)) error {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	file, err := openReadOnlyFile(f.path)
 
 	if err != nil {

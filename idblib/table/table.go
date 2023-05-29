@@ -121,6 +121,9 @@ func (t *Table) GetIndex(fieldName string) (*index.Index, error) {
 }
 
 func (t *Table) index(object object.Object) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	for _, f := range t.Config.Fields {
 		if f.Indexed && f.Name != field.InternalObjectIdField {
 			i, err := t.GetIndex(f.Name)
@@ -149,6 +152,9 @@ func (t *Table) index(object object.Object) {
 }
 
 func (t *Table) unIndex(object object.Object) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	for _, f := range t.Config.Fields {
 		if f.Indexed && f.Name != field.InternalObjectIdField {
 			i, err := t.GetIndex(f.Name)
@@ -182,6 +188,9 @@ func (t *Table) updateIndex(object object.Object) {
 }
 
 func (t *Table) Where(w request.Where, andObjects object.Objects) (object.Objects, error) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	f := t.Config.Fields[w.Field]
 
 	i, err := t.GetIndex(w.Field)
@@ -294,6 +303,9 @@ func (t *Table) Where(w request.Where, andObjects object.Objects) (object.Object
 }
 
 func (t *Table) Query(q Query, andObjects object.Objects, additionalFields AdditionalFields) (object.Objects, AdditionalFields, error) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	runMiddleware, runQuery := QueryMiddleware(t, q)
 
 	if runMiddleware {
@@ -406,6 +418,9 @@ func (t *Table) Query(q Query, andObjects object.Objects, additionalFields Addit
 }
 
 func (t *Table) Insert(objectM map[string]json.RawMessage) error {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	runMiddleware, insert := InsertMiddleware(t, objectM)
 
 	if runMiddleware {
@@ -436,6 +451,9 @@ func (t *Table) Insert(objectM map[string]json.RawMessage) error {
 }
 
 func (t *Table) Update(objectM map[string]json.RawMessage) error {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	runMiddleware, update := UpdateMiddleware(t, objectM)
 
 	if runMiddleware {
@@ -488,6 +506,9 @@ func (t *Table) Update(objectM map[string]json.RawMessage) error {
 }
 
 func (t *Table) Remove(object *object.Object) error {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	runMiddleware, remove := RemoveMiddleware(t, object)
 
 	if runMiddleware {
@@ -500,6 +521,9 @@ func (t *Table) Remove(object *object.Object) error {
 }
 
 func (t *Table) FindExisting(object map[string]json.RawMessage) (int64, error) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	for fieldName, f := range t.Config.Fields {
 		value, err := idbutil.JsonRawToDBType(object[fieldName], f)
 
@@ -526,6 +550,9 @@ func (t *Table) FindExisting(object map[string]json.RawMessage) (int64, error) {
 }
 
 func (t *Table) and(objects object.Objects, otherObjects object.Objects) object.Objects {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	results := object.Objects{}
 
 	for _, o := range objects {
@@ -541,6 +568,9 @@ func (t *Table) and(objects object.Objects, otherObjects object.Objects) object.
 }
 
 func (t *Table) Sort(o object.Objects, fieldName string, additionalFields AdditionalFields, direction request.SortDirection) (object.Objects, error) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	i, err := t.GetIndex(fieldName)
 
 	if err != nil {
@@ -570,6 +600,9 @@ func (t *Table) Sort(o object.Objects, fieldName string, additionalFields Additi
 }
 
 func (t *Table) SkipAndLimit(objects object.Objects, skip *int64, limit *int64) object.Objects {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	var results object.Objects
 
 	if skip != nil && limit != nil {
@@ -600,6 +633,9 @@ func (t *Table) SkipAndLimit(objects object.Objects, skip *int64, limit *int64) 
 }
 
 func (t *Table) isUnique(m map[string]dbtype.DBType) error {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	for fieldName, f := range t.Config.Fields {
 		if f.Unique && f.Name != field.InternalObjectIdField {
 			i, err := t.GetIndex(fieldName)
@@ -646,6 +682,9 @@ func (t *Table) isUnique(m map[string]dbtype.DBType) error {
 }
 
 func (t *Table) allFieldsHaveValues(m map[string]dbtype.DBType) error {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	for fieldName, f := range t.Config.Fields {
 		if m[fieldName] == nil && !f.Null && f.Name != field.InternalObjectIdField {
 			return e.ObjectDoesNotHaveValueForField(fieldName)
@@ -656,6 +695,9 @@ func (t *Table) allFieldsHaveValues(m map[string]dbtype.DBType) error {
 }
 
 func (t *Table) andEqual(andObjects object.Objects, field string, value dbtype.DBType) (object.Objects, error) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	results := object.Objects{}
 
 	i, err := t.GetIndex(field)
@@ -674,6 +716,9 @@ func (t *Table) andEqual(andObjects object.Objects, field string, value dbtype.D
 }
 
 func (t *Table) andNot(andObjects object.Objects, field string, value dbtype.DBType) (object.Objects, error) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	results := object.Objects{}
 
 	i, err := t.GetIndex(field)
@@ -692,6 +737,9 @@ func (t *Table) andNot(andObjects object.Objects, field string, value dbtype.DBT
 }
 
 func (t *Table) andMatch(andObjects object.Objects, field string, r regexp.Regexp) (object.Objects, error) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	results := object.Objects{}
 
 	i, err := t.GetIndex(field)
@@ -710,6 +758,9 @@ func (t *Table) andMatch(andObjects object.Objects, field string, r regexp.Regex
 }
 
 func (t *Table) andSmaller(andObjects object.Objects, field string, value dbtype.DBType) (object.Objects, error) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	results := object.Objects{}
 
 	i, err := t.GetIndex(field)
@@ -728,6 +779,9 @@ func (t *Table) andSmaller(andObjects object.Objects, field string, value dbtype
 }
 
 func (t *Table) andLarger(andObjects object.Objects, field string, value dbtype.DBType) (object.Objects, error) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	results := object.Objects{}
 
 	i, err := t.GetIndex(field)
@@ -746,6 +800,9 @@ func (t *Table) andLarger(andObjects object.Objects, field string, value dbtype.
 }
 
 func (t *Table) andBetween(andObjects object.Objects, field string, smaller dbtype.DBType, larger dbtype.DBType) (object.Objects, error) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	results := object.Objects{}
 
 	i, err := t.GetIndex(field)
@@ -764,6 +821,9 @@ func (t *Table) andBetween(andObjects object.Objects, field string, smaller dbty
 }
 
 func (t *Table) removeDuplicates(o object.Objects) object.Objects {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	duplicates := map[int64]bool{}
 	var results object.Objects
 
@@ -780,6 +840,9 @@ func (t *Table) removeDuplicates(o object.Objects) object.Objects {
 }
 
 func (t *Table) JsonRawMapToMapDbType(m map[string]json.RawMessage) (map[string]dbtype.DBType, error) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	r := map[string]dbtype.DBType{}
 
 	for _, f := range t.Config.Fields {
@@ -806,6 +869,9 @@ func (t *Table) JsonRawMapToMapDbType(m map[string]json.RawMessage) (map[string]
 }
 
 func (t *Table) ObjectToJsonRawMap(o object.Object) (map[string]json.RawMessage, error) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	m := map[string]json.RawMessage{}
 
 	for _, f := range t.Config.Fields {
