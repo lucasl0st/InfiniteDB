@@ -112,10 +112,22 @@ func (s *SharedFile) Read(lineNumbers []int64) ([]string, error) {
 }
 
 func (s *SharedFile) readChanges() error {
-	return s.file.ReadAtStartLine(s.readLines, func(line string) {
+	err := s.file.ReadAtStartLine(s.readLines, func(line string) {
 		s.addedLine(line)
-		s.readLines++
 	})
+
+	if err != nil {
+		return err
+	}
+
+	lines, err := s.file.NumberOfLines()
+
+	if err != nil {
+		return err
+	}
+
+	s.readLines = int64(lines)
+	return nil
 }
 
 func (s *SharedFile) watchChanges() {
