@@ -5,7 +5,6 @@
 package file
 
 import (
-	"bufio"
 	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
 	"os"
 	"sort"
@@ -13,6 +12,8 @@ import (
 
 type File struct {
 	path string
+
+	cachedScanner *CachedScanner
 }
 
 func New(path string) (*File, error) {
@@ -31,13 +32,20 @@ func New(path string) (*File, error) {
 	}
 
 	return &File{
-		path: path,
+		path:          path,
+		cachedScanner: NewCachedScanner(path),
 	}, nil
 }
 
 func (f *File) Append(lines []string) error {
 	measurementId := metrics.StartTimingMeasurement()
 	defer metrics.StopTimingMeasurement(measurementId)
+
+	err := f.cachedScanner.Close()
+
+	if err != nil {
+		return err
+	}
 
 	file, err := openWritableFile(f.path)
 
@@ -72,79 +80,57 @@ func (f *File) Read(lineNumbers []int64) ([]string, error) {
 		return lineNumbers[i] < lineNumbers[j]
 	})
 
-	file, err := openReadOnlyFile(f.path)
+	err := f.cachedScanner.Open()
 
 	if err != nil {
 		return nil, err
 	}
 
-	defer func() {
-		err = file.Close()
-	}()
-
-	scanner := bufio.NewScanner(file)
-	scanner.Split(bufio.ScanLines)
-
 	var lines []string
 
-	var i = 0
-	var line int64 = 0
+	for _, lineNumber := range lineNumbers {
+		err = f.cachedScanner.GetLineFrom(lineNumber, func(lineNumber int64, line string) bool {
+			lines = append(lines, line)
 
-	for scanner.Scan() {
-		if line == lineNumbers[i] {
-			text := scanner.Text()
+			return false
+		})
 
-			for {
-				lines = append(lines, text)
-
-				i++
-
-				if i >= len(lineNumbers) {
-					break
-				}
-
-				if lineNumbers[i] != line {
-					break
-				}
-			}
-
-			if i >= len(lineNumbers) {
-				break
-			}
+		if err != nil {
+			return nil, err
 		}
-
-		line++
 	}
 
-	return lines, err
+	return lines, nil
 }
 
 func (f *File) ReadAtStartLine(start int64, readLine func(line string)) error {
 	measurementId := metrics.StartTimingMeasurement()
 	defer metrics.StopTimingMeasurement(measurementId)
 
-	file, err := openReadOnlyFile(f.path)
+	err := f.cachedScanner.Open()
 
 	if err != nil {
 		return err
 	}
 
-	defer func() {
-		err = file.Close()
-	}()
+	err = f.cachedScanner.GetLineFrom(start, func(lineNumber int64, line string) bool {
+		readLine(line)
+		return true
+	})
 
-	scanner := bufio.NewScanner(file)
-	scanner.Split(bufio.ScanLines)
-
-	var line int64 = 0
-
-	for scanner.Scan() {
-		if line >= start {
-			readLine(scanner.Text())
-		}
-
-		line++
+	if err != nil {
+		return err
 	}
 
-	return err
+	return nil
+}
+
+func (f *File) NumberOfLines() (int, error) {
+	err := f.cachedScanner.Open()
+
+	if err != nil {
+		return 0, err
+	}
+
+	return f.cachedScanner.NumberOfLines()
 }
