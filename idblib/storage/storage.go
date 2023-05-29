@@ -10,6 +10,7 @@ import (
 	"github.com/lucasl0st/InfiniteDB/idblib/cache"
 	"github.com/lucasl0st/InfiniteDB/idblib/dbtype"
 	"github.com/lucasl0st/InfiniteDB/idblib/field"
+	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
 	idblib "github.com/lucasl0st/InfiniteDB/idblib/object"
 	idbutil "github.com/lucasl0st/InfiniteDB/idblib/util"
 	"github.com/lucasl0st/InfiniteDB/util"
@@ -97,6 +98,9 @@ func (s *Storage) addedLineInFile(line string) {
 }
 
 func (s *Storage) GetObject(id int64) *idblib.Object {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	objects := s.GetObjects([]int64{id})
 
 	if len(objects) > 1 {
@@ -109,6 +113,9 @@ func (s *Storage) GetObject(id int64) *idblib.Object {
 }
 
 func (s *Storage) GetObjects(ids []int64) []idblib.Object {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	var objects []idblib.Object
 
 	var notCached []int64
@@ -152,12 +159,18 @@ func (s *Storage) GetObjects(ids []int64) []idblib.Object {
 }
 
 func (s *Storage) AddObject(m map[string]dbtype.DBType) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	s.writeObjects([]object{
 		s.mapStringDbTypeToStorageObject(m),
 	})
 }
 
 func (s *Storage) UpdateObject(o idblib.Object) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	storageObject := s.mapStringDbTypeToStorageObject(o.M)
 	storageObject.RefersTo = &o.Id
 
@@ -167,6 +180,9 @@ func (s *Storage) UpdateObject(o idblib.Object) {
 }
 
 func (s *Storage) DeleteObject(o idblib.Object) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	storageObject := s.mapStringDbTypeToStorageObject(o.M)
 	storageObject.RefersTo = &o.Id
 	storageObject.Deleted = util.Ptr(true)

@@ -14,14 +14,6 @@ type Metrics struct {
 	databasesLock sync.RWMutex
 	databases     map[string]metric.DatabaseMetrics
 
-	getTimeAverage time.Duration
-	getTime        time.Duration
-	getTimeAmount  int64
-
-	insertTimeAverage time.Duration
-	insertTime        time.Duration
-	insertTimeAmount  int64
-
 	r *metric.Receiver
 }
 
@@ -85,16 +77,6 @@ func (m *Metrics) AddTotalObject(database string, table string) {
 	m.databases[database].Tables[table] = tableMetric
 }
 
-func (m *Metrics) InsertTime(time time.Duration) {
-	m.insertTime += time
-	m.insertTimeAmount++
-}
-
-func (m *Metrics) GetTime(time time.Duration) {
-	m.getTime += time
-	m.getTimeAmount++
-}
-
 func (m *Metrics) runner() {
 	m.databasesLock.Lock()
 	defer m.databasesLock.Unlock()
@@ -111,22 +93,13 @@ func (m *Metrics) runner() {
 		m.databases[database] = databaseMetrics
 	}
 
-	if m.insertTimeAmount != 0 {
-		m.insertTimeAverage = time.Duration(m.insertTime.Nanoseconds() / m.insertTimeAmount)
+	averageTimingMeasurements := getAverageTimingMeasurements()
+
+	performanceMetrics := metric.PerformanceMetrics{Functions: map[string]metric.FunctionMetrics{}}
+
+	for name, average := range averageTimingMeasurements {
+		performanceMetrics.Functions[name] = metric.FunctionMetrics{AverageFunctionCallDuration: average}
 	}
 
-	m.insertTime = 0
-	m.insertTimeAmount = 0
-
-	if m.getTimeAmount != 0 {
-		m.getTimeAverage = time.Duration(m.getTime.Nanoseconds() / m.getTimeAmount)
-	}
-
-	m.getTime = 0
-	m.getTimeAmount = 0
-
-	(*m.r).PerformanceMetrics(metric.PerformanceMetrics{
-		AverageObjectInsertTime: m.insertTimeAverage,
-		AverageObjectGetTime:    m.getTimeAverage,
-	})
+	(*m.r).PerformanceMetrics(performanceMetrics)
 }

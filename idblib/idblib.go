@@ -325,13 +325,14 @@ func (i *IDB) DeleteTableInDatabase(name string, tableName string) (response.Del
 }
 
 func (i *IDB) GetFromDatabaseTable(name string, tableName string, request table.Request) (response.GetFromDatabaseTableResponse, error) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	d := i.databases[name]
 
 	if d == nil {
 		return response.GetFromDatabaseTableResponse{}, e.DatabaseDoesNotExist()
 	}
-
-	start := time.Now()
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -359,9 +360,6 @@ func (i *IDB) GetFromDatabaseTable(name string, tableName string, request table.
 		return response.GetFromDatabaseTableResponse{}, err
 	}
 
-	elapsed := time.Since(start)
-	i.m.GetTime(elapsed)
-
 	return response.GetFromDatabaseTableResponse{
 		Name:      name,
 		TableName: tableName,
@@ -370,13 +368,14 @@ func (i *IDB) GetFromDatabaseTable(name string, tableName string, request table.
 }
 
 func (i *IDB) InsertToDatabaseTable(name string, tableName string, object map[string]json.RawMessage) (response.InsertToDatabaseTableResponse, error) {
+	measurementId := metrics.StartTimingMeasurement()
+	defer metrics.StopTimingMeasurement(measurementId)
+
 	d := i.databases[name]
 
 	if d == nil {
 		return response.InsertToDatabaseTableResponse{}, e.DatabaseDoesNotExist()
 	}
-
-	start := time.Now()
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -398,9 +397,6 @@ func (i *IDB) InsertToDatabaseTable(name string, tableName string, object map[st
 	if err != nil {
 		return response.InsertToDatabaseTableResponse{}, err
 	}
-
-	elapsed := time.Since(start)
-	i.m.InsertTime(elapsed)
 
 	return response.InsertToDatabaseTableResponse{
 		Name:      name,
