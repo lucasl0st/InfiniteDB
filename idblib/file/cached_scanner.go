@@ -13,8 +13,7 @@ import (
 type CachedScanner struct {
 	path string
 
-	fileLock sync.Mutex
-	file     *os.File
+	file *os.File
 
 	lineCacheLock sync.RWMutex
 	lineCache     map[int64]int64
@@ -51,17 +50,11 @@ func (c *CachedScanner) Close() error {
 		return nil
 	}
 
-	c.fileLock.Lock()
-	defer c.fileLock.Unlock()
-
 	c.opened = false
 	return c.file.Close()
 }
 
 func (c *CachedScanner) GetLineFrom(lineNumber int64, reader func(lineNumber int64, line string) bool) error {
-	c.fileLock.Lock()
-	defer c.fileLock.Unlock()
-
 	c.lineCacheLock.RLock()
 	_, ok := c.lineCache[lineNumber]
 	c.lineCacheLock.RUnlock()
@@ -135,9 +128,6 @@ func (c *CachedScanner) buildCache() error {
 }
 
 func (c *CachedScanner) NumberOfLines() (int, error) {
-	c.fileLock.Lock()
-	defer c.fileLock.Unlock()
-
 	err := c.buildCache()
 
 	if err != nil {

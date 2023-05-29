@@ -8,12 +8,14 @@ import (
 	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
 	"os"
 	"sort"
+	"sync"
 )
 
 type File struct {
 	path string
 
 	cachedScanner *CachedScanner
+	sync.Mutex
 }
 
 func New(path string) (*File, error) {
@@ -40,6 +42,9 @@ func New(path string) (*File, error) {
 func (f *File) Append(lines []string) error {
 	measurementId := metrics.StartTimingMeasurement()
 	defer metrics.StopTimingMeasurement(measurementId)
+
+	f.Lock()
+	defer f.Unlock()
 
 	err := f.cachedScanner.Close()
 
@@ -80,6 +85,9 @@ func (f *File) Read(lineNumbers []int64) ([]string, error) {
 		return lineNumbers[i] < lineNumbers[j]
 	})
 
+	f.Lock()
+	defer f.Unlock()
+
 	err := f.cachedScanner.Open()
 
 	if err != nil {
@@ -107,6 +115,9 @@ func (f *File) ReadAtStartLine(start int64, readLine func(line string)) error {
 	measurementId := metrics.StartTimingMeasurement()
 	defer metrics.StopTimingMeasurement(measurementId)
 
+	f.Lock()
+	defer f.Unlock()
+
 	err := f.cachedScanner.Open()
 
 	if err != nil {
@@ -126,11 +137,20 @@ func (f *File) ReadAtStartLine(start int64, readLine func(line string)) error {
 }
 
 func (f *File) NumberOfLines() (int, error) {
+	f.Lock()
+	defer f.Unlock()
+
 	err := f.cachedScanner.Open()
 
 	if err != nil {
 		return 0, err
 	}
 
-	return f.cachedScanner.NumberOfLines()
+	lines, err := f.cachedScanner.NumberOfLines()
+
+	if err != nil {
+		return 0, err
+	}
+
+	return lines, nil
 }
