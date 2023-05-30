@@ -7,4 +7,5 @@ package metric
 type Receiver interface {
 	DatabaseMetrics(database string, m DatabaseMetrics)
 	PerformanceMetrics(m PerformanceMetrics)
+	MemStatsMetrics(m MemStatsMetrics)
 }
