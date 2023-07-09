@@ -21,3 +21,7 @@ func TableAlreadyExists() error {
 func TableDoesNotExist() error {
 	return errors.New("table does not exist")
 }
+
+func IdbNotReady() error {
+	return errors.New("idb is not ready")
+}
