@@ -51,27 +51,31 @@ func New(
 		SubmitMetric: s.submitMetric,
 	}
 
-	idb, err := idblib.New(config.DatabasePath, idbLogger, &metricsReceiver, config.CacheSize)
+	l.Println("starting up idb")
+
+	idb, err := idblib.New(config.DatabasePath, idbLogger, &metricsReceiver, config.CacheSize, func() {
+		err = internal_database.SetupInternalDatabase(s.idb)
+
+		if err != nil {
+			l.Fatal(e.FailedToSetupInternalDatabase(err))
+		}
+
+		if config.Authentication {
+			err = internal_database.SetupAuthenticationTable(s.idb)
+
+			if err != nil {
+				l.Fatal(e.FailedToSetupInternalAuthenticationTable(err))
+			}
+		}
+
+		table.CreateDatabaseMiddleware = CreateDatabaseMiddleware
+
+		l.Println("idb is ready")
+	})
 
 	if err != nil {
 		return nil, err
 	}
-
-	err = internal_database.SetupInternalDatabase(idb)
-
-	if err != nil {
-		return nil, e.FailedToSetupInternalDatabase(err)
-	}
-
-	if config.Authentication {
-		err = internal_database.SetupAuthenticationTable(idb)
-
-		if err != nil {
-			return nil, e.FailedToSetupInternalAuthenticationTable(err)
-		}
-	}
-
-	table.CreateDatabaseMiddleware = CreateDatabaseMiddleware
 
 	r := gin.New()
 	r.Use(gin.Recovery())
