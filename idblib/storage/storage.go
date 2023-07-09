@@ -13,7 +13,6 @@ import (
 	"github.com/lucasl0st/InfiniteDB/idblib/metrics"
 	idblib "github.com/lucasl0st/InfiniteDB/idblib/object"
 	idbutil "github.com/lucasl0st/InfiniteDB/idblib/util"
-	"github.com/lucasl0st/InfiniteDB/util"
 )
 
 const objectsFileName = "objects.idb"
@@ -70,31 +69,34 @@ func (s *Storage) Kill() {
 	s.file.Kill()
 }
 
-func (s *Storage) addedLineInFile(line string) {
-	var storageObject object
+func (s *Storage) addedLineInFile(lineNumber int64, line string) {
+	var event Event
 
-	err := json.Unmarshal([]byte(line), &storageObject)
+	err := json.Unmarshal([]byte(line), &event)
 
 	if err != nil {
 		s.logger.Fatal(err.Error())
 	}
 
-	if storageObject.Deleted != nil && *storageObject.Deleted == true {
-		o := s.GetObject(*storageObject.RefersTo)
+	if event.Type == EventTypeRemove {
+		o := s.GetObject(*event.RefersTo)
 		s.deletedObject(*o)
 
 		s.NumberOfObjects--
-
 		return
-	} else if storageObject.RefersTo != nil {
-		o := s.GetObject(*storageObject.RefersTo)
-		s.DeleteObject(*o)
-	} else {
+	}
+
+	if event.Type == EventTypeUpdate {
+		o := s.GetObject(*event.RefersTo)
+		s.deletedObject(*o)
+	}
+
+	if event.Type == EventTypeAdd {
 		s.NumberOfObjects++
 		s.metricAddTotalObject()
 	}
 
-	s.addedObject(s.storageObjectToObject(storageObject))
+	s.addedObject(s.eventToObject(lineNumber, event))
 }
 
 func (s *Storage) GetObject(id int64) *idblib.Object {
@@ -139,16 +141,16 @@ func (s *Storage) GetObjects(ids []int64) []idblib.Object {
 		s.logger.Fatal(err.Error())
 	}
 
-	for _, line := range lines {
-		var storageObject object
+	for lineNumber, line := range lines {
+		var event Event
 
-		err = json.Unmarshal([]byte(line), &storageObject)
+		err = json.Unmarshal([]byte(line), &event)
 
 		if err != nil {
 			s.logger.Fatal(err.Error())
 		}
 
-		o := s.storageObjectToObject(storageObject)
+		o := s.eventToObject(lineNumber, event)
 
 		objects = append(objects, o)
 
@@ -162,8 +164,8 @@ func (s *Storage) AddObject(m map[string]dbtype.DBType) {
 	measurementId := metrics.StartTimingMeasurement()
 	defer metrics.StopTimingMeasurement(measurementId)
 
-	s.writeObjects([]object{
-		s.mapStringDbTypeToStorageObject(m),
+	s.writeEvents([]Event{
+		s.mapStringDbTypeToEvent(m, EventTypeAdd, nil),
 	})
 }
 
@@ -171,32 +173,23 @@ func (s *Storage) UpdateObject(o idblib.Object) {
 	measurementId := metrics.StartTimingMeasurement()
 	defer metrics.StopTimingMeasurement(measurementId)
 
-	storageObject := s.mapStringDbTypeToStorageObject(o.M)
-	storageObject.RefersTo = &o.Id
-
-	s.writeObjects([]object{
-		storageObject,
+	s.writeEvents([]Event{
+		s.mapStringDbTypeToEvent(o.M, EventTypeUpdate, &o.Id),
 	})
 }
 
-func (s *Storage) DeleteObject(o idblib.Object) {
+func (s *Storage) RemoveObject(o idblib.Object) {
 	measurementId := metrics.StartTimingMeasurement()
 	defer metrics.StopTimingMeasurement(measurementId)
 
-	storageObject := s.mapStringDbTypeToStorageObject(o.M)
-	storageObject.RefersTo = &o.Id
-	storageObject.Deleted = util.Ptr(true)
-
-	s.writeObjects([]object{
-		storageObject,
+	s.writeEvents([]Event{
+		s.mapStringDbTypeToEvent(nil, EventTypeRemove, &o.Id),
 	})
 }
 
-func (s *Storage) writeObjects(objects []object) {
-	err := s.file.Write(objects, func(object object, lineNumber int64) string {
-		object.LineNumber = lineNumber
-
-		bytes, err := json.Marshal(object)
+func (s *Storage) writeEvents(events []Event) {
+	err := s.file.Write(events, func(event Event, lineNumber int64) string {
+		bytes, err := json.Marshal(event)
 
 		if err != nil {
 			s.logger.Fatal(err.Error())
@@ -204,10 +197,11 @@ func (s *Storage) writeObjects(objects []object) {
 
 		s.metricWroteObject()
 
-		s.c.Remove(object.LineNumber)
+		//invalidate cache
+		s.c.Remove(lineNumber)
 
-		if object.RefersTo != nil {
-			s.c.Remove(*object.RefersTo)
+		if event.RefersTo != nil {
+			s.c.Remove(*event.RefersTo)
 		}
 
 		return string(bytes)
@@ -218,14 +212,14 @@ func (s *Storage) writeObjects(objects []object) {
 	}
 }
 
-func (s *Storage) storageObjectToObject(storageObject object) idblib.Object {
+func (s *Storage) eventToObject(eventId int64, event Event) idblib.Object {
 	o := idblib.Object{
-		Id: storageObject.LineNumber,
+		Id: eventId,
 		M:  map[string]dbtype.DBType{},
 	}
 
 	for _, f := range s.fields {
-		str, ok := storageObject.Object[f.Name]
+		str, ok := event.Data[f.Name]
 
 		if !ok {
 			continue
@@ -243,14 +237,16 @@ func (s *Storage) storageObjectToObject(storageObject object) idblib.Object {
 	return o
 }
 
-func (s *Storage) mapStringDbTypeToStorageObject(m map[string]dbtype.DBType) object {
-	storageObject := object{
-		Object: map[string]string{},
+func (s *Storage) mapStringDbTypeToEvent(m map[string]dbtype.DBType, eventType EventType, refersTo *int64) Event {
+	event := Event{
+		Type:     eventType,
+		Data:     map[string]string{},
+		RefersTo: refersTo,
 	}
 
 	for key, value := range m {
-		storageObject.Object[key] = value.ToString()
+		event.Data[key] = value.ToString()
 	}
 
-	return storageObject
+	return event
 }
