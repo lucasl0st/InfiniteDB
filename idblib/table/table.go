@@ -515,7 +515,7 @@ func (t *Table) Remove(object *object.Object) error {
 		return remove()
 	}
 
-	t.Storage.DeleteObject(*object)
+	t.Storage.RemoveObject(*object)
 
 	return nil
 }

@@ -73,7 +73,7 @@ func (f *File) Append(lines []string) error {
 	return err
 }
 
-func (f *File) Read(lineNumbers []int64) ([]string, error) {
+func (f *File) Read(lineNumbers []int64) (map[int64]string, error) {
 	measurementId := metrics.StartTimingMeasurement()
 	defer metrics.StopTimingMeasurement(measurementId)
 
@@ -94,11 +94,11 @@ func (f *File) Read(lineNumbers []int64) ([]string, error) {
 		return nil, err
 	}
 
-	var lines []string
+	lines := map[int64]string{}
 
 	for _, lineNumber := range lineNumbers {
 		err = f.cachedScanner.GetLineFrom(lineNumber, func(lineNumber int64, line string) bool {
-			lines = append(lines, line)
+			lines[lineNumber] = line
 
 			return false
 		})
@@ -111,7 +111,7 @@ func (f *File) Read(lineNumbers []int64) ([]string, error) {
 	return lines, nil
 }
 
-func (f *File) ReadAtStartLine(start int64, readLine func(line string)) error {
+func (f *File) ReadAtStartLine(start int64, readLine func(lineNumber int64, line string)) error {
 	measurementId := metrics.StartTimingMeasurement()
 	defer metrics.StopTimingMeasurement(measurementId)
 
@@ -125,7 +125,7 @@ func (f *File) ReadAtStartLine(start int64, readLine func(line string)) error {
 	}
 
 	err = f.cachedScanner.GetLineFrom(start, func(lineNumber int64, line string) bool {
-		readLine(line)
+		readLine(lineNumber, line)
 		return true
 	})
 
