@@ -77,7 +77,13 @@ func New(
 		return nil, err
 	}
 
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{
+		SkipPaths: []string{
+			"/health",
+		},
+	}))
 
 	httpApi := http.New(
 		idb,
