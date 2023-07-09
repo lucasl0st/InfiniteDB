@@ -16,7 +16,7 @@ type SharedFile struct {
 	*file.Lock
 
 	readLines int64
-	addedLine func(line string)
+	addedLine func(lineNumber int64, line string)
 
 	watcher *fsnotify.Watcher
 	watch   bool
@@ -24,7 +24,7 @@ type SharedFile struct {
 	logger idbutil.Logger
 }
 
-func New(path string, addedLine func(line string), logger idbutil.Logger) (*SharedFile, error) {
+func New(path string, addedLine func(lineNumber int64, line string), logger idbutil.Logger) (*SharedFile, error) {
 	f, err := file.New(path)
 
 	if err != nil {
@@ -68,7 +68,7 @@ func New(path string, addedLine func(line string), logger idbutil.Logger) (*Shar
 	return s, nil
 }
 
-func (s *SharedFile) Write(objects []object, getLine func(object object, lineNumber int64) string) error {
+func (s *SharedFile) Write(events []Event, getLine func(event Event, lineNumber int64) string) error {
 	measurementId := metrics.StartTimingMeasurement()
 	defer metrics.StopTimingMeasurement(measurementId)
 
@@ -84,7 +84,7 @@ func (s *SharedFile) Write(objects []object, getLine func(object object, lineNum
 
 	var lines []string
 
-	for _, o := range objects {
+	for _, o := range events {
 		line := getLine(o, s.readLines)
 		lines = append(lines, line)
 	}
@@ -104,7 +104,7 @@ func (s *SharedFile) Write(objects []object, getLine func(object object, lineNum
 	return err
 }
 
-func (s *SharedFile) Read(lineNumbers []int64) ([]string, error) {
+func (s *SharedFile) Read(lineNumbers []int64) (map[int64]string, error) {
 	measurementId := metrics.StartTimingMeasurement()
 	defer metrics.StopTimingMeasurement(measurementId)
 
@@ -112,9 +112,7 @@ func (s *SharedFile) Read(lineNumbers []int64) ([]string, error) {
 }
 
 func (s *SharedFile) readChanges() error {
-	err := s.file.ReadAtStartLine(s.readLines, func(line string) {
-		s.addedLine(line)
-	})
+	err := s.file.ReadAtStartLine(s.readLines, s.addedLine)
 
 	if err != nil {
 		return err
