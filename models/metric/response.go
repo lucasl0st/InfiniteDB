@@ -12,3 +12,7 @@ type DatabaseMetricResponse struct {
 type PerformanceMetricResponse struct {
 	Metrics PerformanceMetrics `json:"metrics"`
 }
+
+type MemStatsMetricResponse struct {
+	Metrics MemStatsMetrics `json:"metrics"`
+}

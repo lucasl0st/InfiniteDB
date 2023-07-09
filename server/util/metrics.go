@@ -20,3 +20,7 @@ func (r *MetricsReceiver) DatabaseMetrics(database string, m metric.DatabaseMetr
 func (r *MetricsReceiver) PerformanceMetrics(m metric.PerformanceMetrics) {
 	r.SubmitMetric(metric.PerformanceMetric, metric.PerformanceMetricResponse{Metrics: m})
 }
+
+func (r *MetricsReceiver) MemStatsMetrics(m metric.MemStatsMetrics) {
+	r.SubmitMetric(metric.MemStatsMetric, metric.MemStatsMetricResponse{Metrics: m})
+}

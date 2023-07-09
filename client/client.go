@@ -8,7 +8,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
 	e "github.com/lucasl0st/InfiniteDB/models/errors"
 	"github.com/lucasl0st/InfiniteDB/models/method"
@@ -171,78 +170,6 @@ func (c *Client) handleResponse(msg map[string]interface{}) {
 		c.handleRequestResultResponseMethod(msg)
 	case fmt.Sprint(method.MetricsUpdateMethod):
 		c.handleMetricsUpdateMethod(msg)
-	}
-}
-
-func (c *Client) handleHeloMethod(msg map[string]interface{}) {
-	version, isString := msg["database_version"].(string)
-
-	if !isString {
-		panic(e.DidNotReceiveDatabaseVersion())
-	}
-
-	if version != VERSION {
-		panic(e.ClientNotCompatibleWithDatabaseServer(version, VERSION))
-	}
-
-	fmt.Println("connected")
-
-	c.connected = true
-}
-
-func (c *Client) handleGenericErrorMethod(msg map[string]interface{}) {
-	panic(msg["message"].(string))
-}
-
-func (c *Client) handleRequestResultResponseMethod(msg map[string]interface{}) {
-	requestId := int64(msg["requestId"].(float64))
-
-	status, ok := msg["status"].(float64)
-
-	if ok {
-		r := RequestResult{}
-
-		if status == http.StatusOK {
-			r.M = msg
-		} else {
-			r.Err = errors.New(msg["message"].(string))
-		}
-
-		if c.getChannel(requestId) != nil {
-			c.getChannel(requestId) <- r
-		} else if c.connected {
-			panic(r.Err)
-		}
-	}
-}
-
-func (c *Client) handleMetricsUpdateMethod(msg map[string]interface{}) {
-	if c.MetricsReceiver != nil {
-		m := msg["metric"]
-
-		switch m {
-		case fmt.Sprint(metric.DatabaseMetric):
-			var databaseMetricsResponse metric.DatabaseMetricResponse
-
-			err := mapToStruct(msg["value"].(map[string]interface{}), &databaseMetricsResponse)
-
-			if err != nil {
-				panic(err.Error())
-			}
-
-			c.MetricsReceiver.DatabaseMetrics(databaseMetricsResponse.Database, databaseMetricsResponse.Metrics)
-
-		case fmt.Sprint(metric.PerformanceMetric):
-			var performanceMetricsResponse metric.PerformanceMetricResponse
-
-			err := mapToStruct(msg["value"].(map[string]interface{}), &performanceMetricsResponse)
-
-			if err != nil {
-				panic(err.Error())
-			}
-
-			c.MetricsReceiver.PerformanceMetrics(performanceMetricsResponse.Metrics)
-		}
 	}
 }
 

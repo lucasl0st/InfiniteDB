@@ -29,6 +29,7 @@ var renderingMetrics = false
 
 var databaseMetrics map[string]metric.DatabaseMetrics
 var performanceMetrics metric.PerformanceMetrics
+var memStatsMetrics metric.MemStatsMetrics
 
 type MetricsReceiver struct {
 }
@@ -41,6 +42,12 @@ func (r MetricsReceiver) DatabaseMetrics(database string, m metric.DatabaseMetri
 
 func (r MetricsReceiver) PerformanceMetrics(m metric.PerformanceMetrics) {
 	performanceMetrics = m
+
+	renderMetrics()
+}
+
+func (r MetricsReceiver) MemStatsMetrics(m metric.MemStatsMetrics) {
+	memStatsMetrics = m
 
 	renderMetrics()
 }
@@ -98,6 +105,7 @@ func renderMetrics() {
 
 	renderDatabaseMetrics()
 	renderPerformanceMetrics()
+	renderMemStatsMetrics()
 
 	tm.Flush()
 }
@@ -177,4 +185,23 @@ func renderPerformanceMetrics() {
 	}
 
 	t.Render()
+}
+
+func renderMemStatsMetrics() {
+	t := table.NewWriter()
+	t.SetOutputMirror(tm.Output)
+
+	t.AppendHeader(table.Row{"Alloc", "Total Alloc", "Sys", "NumGC"})
+	t.AppendRow(table.Row{
+		fmt.Sprintf("%vmb", bytesToMb(memStatsMetrics.MemStats.Alloc)),
+		fmt.Sprintf("%vmb", bytesToMb(memStatsMetrics.MemStats.TotalAlloc)),
+		fmt.Sprintf("%vmb", bytesToMb(memStatsMetrics.MemStats.Sys)),
+		memStatsMetrics.MemStats.NumGC,
+	})
+
+	t.Render()
+}
+
+func bytesToMb(b uint64) uint64 {
+	return b / 1024 / 1024
 }

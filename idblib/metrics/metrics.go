@@ -6,6 +6,7 @@ package metrics
 
 import (
 	"github.com/lucasl0st/InfiniteDB/models/metric"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -77,7 +78,7 @@ func (m *Metrics) AddTotalObject(database string, table string) {
 	m.databases[database].Tables[table] = tableMetric
 }
 
-func (m *Metrics) runner() {
+func (m *Metrics) sendDatabaseMetrics() {
 	m.databasesLock.Lock()
 	defer m.databasesLock.Unlock()
 
@@ -92,7 +93,9 @@ func (m *Metrics) runner() {
 
 		m.databases[database] = databaseMetrics
 	}
+}
 
+func (m *Metrics) sendPerformanceMetrics() {
 	averageTimingMeasurements := getAverageTimingMeasurements()
 
 	performanceMetrics := metric.PerformanceMetrics{Functions: map[string]metric.FunctionMetrics{}}
@@ -102,4 +105,17 @@ func (m *Metrics) runner() {
 	}
 
 	(*m.r).PerformanceMetrics(performanceMetrics)
+}
+
+func (m *Metrics) sendMemStatsMetrics() {
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	(*m.r).MemStatsMetrics(metric.MemStatsMetrics{MemStats: memStats})
+}
+
+func (m *Metrics) runner() {
+	m.sendDatabaseMetrics()
+	m.sendPerformanceMetrics()
+	m.sendMemStatsMetrics()
 }

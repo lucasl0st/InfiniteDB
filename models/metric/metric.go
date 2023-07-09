@@ -4,12 +4,16 @@
 
 package metric
 
-import "time"
+import (
+	"runtime"
+	"time"
+)
 
 type Metric string
 
 const DatabaseMetric Metric = "databaseMetric"
 const PerformanceMetric Metric = "performanceMetric"
+const MemStatsMetric Metric = "memStatMetric"
 
 type DatabaseMetrics struct {
 	Tables map[string]TableMetrics `json:"tables"`
@@ -26,4 +30,8 @@ type FunctionMetrics struct {
 type TableMetrics struct {
 	InsertedObjects int64 `json:"insertedObjects"`
 	TotalObjects    int64 `json:"totalObjects"`
+}
+
+type MemStatsMetrics struct {
+	MemStats runtime.MemStats `json:"memStats"`
 }
