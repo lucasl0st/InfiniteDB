@@ -20,6 +20,7 @@ import (
 	"github.com/lucasl0st/InfiniteDB/models/metric"
 	"github.com/lucasl0st/InfiniteDB/models/request"
 	"github.com/lucasl0st/InfiniteDB/models/response"
+	"log"
 	"os"
 	"runtime"
 	"strings"
@@ -36,9 +37,10 @@ type IDB struct {
 	watcher        *fsnotify.Watcher
 	watchDatabases bool
 	workerPool     *workerpool.WorkerPool
+	ready          bool
 }
 
-func New(databasePath string, logger util.Logger, metricsReceiver *metric.Receiver, cacheSize uint) (*IDB, error) {
+func New(databasePath string, logger util.Logger, metricsReceiver *metric.Receiver, cacheSize uint, ready func()) (*IDB, error) {
 	if _, err := os.Stat(databasePath); errors.Is(err, os.ErrNotExist) {
 		err := os.MkdirAll(databasePath, os.ModePerm)
 
@@ -70,13 +72,19 @@ func New(databasePath string, logger util.Logger, metricsReceiver *metric.Receiv
 		watcher:        watcher,
 		watchDatabases: true,
 		workerPool:     workerpool.New(workers),
+		ready:          false,
 	}
 
-	err = idb.loadDatabases()
+	go func() {
+		err = idb.loadDatabases()
 
-	if err != nil {
-		return nil, err
-	}
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+
+		idb.ready = true
+		ready()
+	}()
 
 	go func() {
 		for idb.watchDatabases {
@@ -130,6 +138,10 @@ func (i *IDB) Kill() {
 }
 
 func (i *IDB) GetDatabases() (response.GetDatabasesResponse, error) {
+	if !i.ready {
+		return response.GetDatabasesResponse{}, e.IdbNotReady()
+	}
+
 	var databaseNames []string
 
 	for key := range i.databases {
@@ -140,6 +152,10 @@ func (i *IDB) GetDatabases() (response.GetDatabasesResponse, error) {
 }
 
 func (i *IDB) CreateDatabase(name string) (response.CreateDatabaseResponse, error) {
+	if !i.ready {
+		return response.CreateDatabaseResponse{}, e.IdbNotReady()
+	}
+
 	if i.databases[name] != nil {
 		return response.CreateDatabaseResponse{}, e.DatabaseAlreadyExists()
 	}
@@ -163,6 +179,10 @@ func (i *IDB) CreateDatabase(name string) (response.CreateDatabaseResponse, erro
 }
 
 func (i *IDB) DeleteDatabase(name string) (response.DeleteDatabaseResponse, error) {
+	if !i.ready {
+		return response.DeleteDatabaseResponse{}, e.IdbNotReady()
+	}
+
 	d := i.databases[name]
 
 	if d == nil {
@@ -241,6 +261,10 @@ func (i *IDB) loadDatabases() error {
 }
 
 func (i *IDB) GetDatabase(name string) (response.GetDatabaseResponse, error) {
+	if !i.ready {
+		return response.GetDatabaseResponse{}, e.IdbNotReady()
+	}
+
 	d := i.databases[name]
 
 	if d == nil {
@@ -253,6 +277,10 @@ func (i *IDB) GetDatabase(name string) (response.GetDatabaseResponse, error) {
 }
 
 func (i *IDB) GetDatabaseTable(name string, tableName string) (response.GetDatabaseTableResponse, error) {
+	if !i.ready {
+		return response.GetDatabaseTableResponse{}, e.IdbNotReady()
+	}
+
 	d := i.databases[name]
 
 	if d == nil {
@@ -274,6 +302,10 @@ func (i *IDB) GetDatabaseTable(name string, tableName string) (response.GetDatab
 }
 
 func (i *IDB) CreateTableInDatabase(name string, tableName string, fields map[string]field.Field, options request.TableOptions) (response.CreateTableInDatabaseResponse, error) {
+	if !i.ready {
+		return response.CreateTableInDatabaseResponse{}, e.IdbNotReady()
+	}
+
 	d := i.databases[name]
 
 	if d == nil {
@@ -305,6 +337,10 @@ func (i *IDB) CreateTableInDatabase(name string, tableName string, fields map[st
 }
 
 func (i *IDB) DeleteTableInDatabase(name string, tableName string) (response.DeleteTableInDatabaseResponse, error) {
+	if !i.ready {
+		return response.DeleteTableInDatabaseResponse{}, e.IdbNotReady()
+	}
+
 	d := i.databases[name]
 
 	if d == nil {
@@ -325,6 +361,10 @@ func (i *IDB) DeleteTableInDatabase(name string, tableName string) (response.Del
 }
 
 func (i *IDB) GetFromDatabaseTable(name string, tableName string, request table.Request) (response.GetFromDatabaseTableResponse, error) {
+	if !i.ready {
+		return response.GetFromDatabaseTableResponse{}, e.IdbNotReady()
+	}
+
 	measurementId := metrics.StartTimingMeasurement()
 	defer metrics.StopTimingMeasurement(measurementId)
 
@@ -368,6 +408,10 @@ func (i *IDB) GetFromDatabaseTable(name string, tableName string, request table.
 }
 
 func (i *IDB) InsertToDatabaseTable(name string, tableName string, object map[string]json.RawMessage) (response.InsertToDatabaseTableResponse, error) {
+	if !i.ready {
+		return response.InsertToDatabaseTableResponse{}, e.IdbNotReady()
+	}
+
 	measurementId := metrics.StartTimingMeasurement()
 	defer metrics.StopTimingMeasurement(measurementId)
 
@@ -406,6 +450,10 @@ func (i *IDB) InsertToDatabaseTable(name string, tableName string, object map[st
 }
 
 func (i *IDB) RemoveFromDatabaseTable(name string, tableName string, request table.Request) (response.RemoveFromDatabaseTableResponse, error) {
+	if !i.ready {
+		return response.RemoveFromDatabaseTableResponse{}, e.IdbNotReady()
+	}
+
 	d := i.databases[name]
 
 	if d == nil {
@@ -443,6 +491,10 @@ func (i *IDB) RemoveFromDatabaseTable(name string, tableName string, request tab
 }
 
 func (i *IDB) UpdateInDatabaseTable(name string, tableName string, object map[string]json.RawMessage) (response.UpdateInDatabaseTableResponse, error) {
+	if !i.ready {
+		return response.UpdateInDatabaseTableResponse{}, e.IdbNotReady()
+	}
+
 	d := i.databases[name]
 
 	if d == nil {
