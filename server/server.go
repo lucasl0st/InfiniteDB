@@ -73,7 +73,13 @@ func New(
 
 	table.CreateDatabaseMiddleware = CreateDatabaseMiddleware
 
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{
+		SkipPaths: []string{
+			"/health",
+		},
+	}))
 
 	httpApi := http.New(
 		idb,
