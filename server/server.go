@@ -16,6 +16,7 @@ import (
 	"github.com/lucasl0st/InfiniteDB/server/internal_database"
 	serverutil "github.com/lucasl0st/InfiniteDB/server/util"
 	"github.com/lucasl0st/InfiniteDB/server/websocket"
+	"sync"
 )
 
 var l util.Logger
@@ -53,7 +54,13 @@ func New(
 
 	l.Println("starting up idb")
 
+	var wg sync.WaitGroup
+	wg.Add(1)
+
 	idb, err := idblib.New(config.DatabasePath, idbLogger, &metricsReceiver, config.CacheSize, func() {
+		//make sure s.idb is set
+		wg.Wait()
+
 		err = internal_database.SetupInternalDatabase(s.idb)
 
 		if err != nil {
@@ -72,6 +79,11 @@ func New(
 
 		l.Println("idb is ready")
 	})
+
+	s.c = *config
+	s.idb = idb
+
+	wg.Done()
 
 	if err != nil {
 		return nil, err
@@ -102,8 +114,6 @@ func New(
 	)
 	websocketApi.Run(r)
 
-	s.c = *config
-	s.idb = idb
 	s.r = r
 	s.websocketApi = websocketApi
 
