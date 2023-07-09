@@ -198,6 +198,8 @@ func renderMemStatsMetrics() {
 		fmt.Sprintf("%vmb", bytesToMb(memStatsMetrics.MemStats.Sys)),
 		memStatsMetrics.MemStats.NumGC,
 	})
+
+	t.Render()
 }
 
 func bytesToMb(b uint64) uint64 {
